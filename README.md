@@ -1,1 +1,1 @@
-# CRM Ping Flamingo
+# CRM Ping Flamingo - Django CRM System
