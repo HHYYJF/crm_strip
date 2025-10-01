@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Создать сделку</title>
+
+    <!-- Подключаем jQuery из Django -->
+    <script src="{% static 'admin/js/vendor/jquery/jquery.min.js' %}"></script>
+    <!-- Минимальные стили -->
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            background-color: whail;
+        }
+        .container {
+            max-width: 650px;
+            width: 100%;
+            padding: 20px;
+            text-align: center;
+        }
+        .form-container {
+            background-color: #ffffff;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 25px;
+        }
+        .form-container h1 {
+            font-size: 26px;
+            margin-bottom: 25px;
+            color: #333;
+        }
+        .form-row {
+            margin-bottom: 18px;
+            text-align: left;
+        }
+        label {
+            display: inline-block;
+            width: 160px;
+            font-weight: bold;
+            color: #444;
+        }
+        select, input {
+            padding: 6px;
+            width: 260px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            transition: border-color 0.3s;
+        }
+        select:invalid, input:invalid {
+            border-color: #ff4444;
+        }
+        select:focus, input:focus {
+            outline: none;
+            border-color: #4CAF50;
+        }
+        button[type="submit"] {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button[type="submit"]:hover {
+            background-color: #45a049;
+        }
+        button[type="submit"]:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .history-container {
+            background-color: #ffffff;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
+        }
+        .history-container h2 {
+            font-size: 22px;
+            margin-bottom: 15px;
+            color: #333;
+        }
+        .history-item {
+            padding: 12px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .history-item:last-child {
+            border-bottom: none;
+        }
+        .buttons-container {
+            position: fixed;
+            left: 25px;
+            top: 25px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px; /* Расстояние между кнопками */
+        }
+
+        .menu-button {
+            padding: 12px 22px;
+            background-color: white;
+            color: black;
+            border: 2px solid black;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            text-align: center;
+            min-width: 180px; /* Минимальная ширина для выравнивания */
+        }
+
+        .menu-button:hover {
+            background-color: #f0f0f0; /* Светло-серый при наведении */
+            border-color: #333; /* Темнее рамка при наведении */
+        }
+
+        /* Для адаптивности на мобильных */
+        @media (max-width: 768px) {
+            .buttons-container {
+                left: 10px;
+                top: 10px;
+                gap: 8px;
+            }
+
+            .menu-button {
+                padding: 10px 16px;
+                min-width: 160px;
+                font-size: 14px;
+            }
+        }
+        .errorlist {
+            color: #ff4444;
+            margin-bottom: 10px;
+            text-align: left;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="buttons-container">
+        <div class="menu-button">
+            <a href="{% url 'history' %}" style="text-decoration: none; color: inherit;">История</a>
+        </div>
+        <div class="menu-button">
+            <a href="{% url 'calculation' %}" style="text-decoration: none; color: inherit;">Расчет ЗП сотрудникам</a>
+        </div>
+        <div class="menu-button">
+            <a href="{% url 'analysis_view' %}" style="text-decoration: none; color: inherit;">Расчет по сотруднику</a>
+        </div>
+        <div class="menu-button">
+            <a href="{% url 'calculation_products' %}" style="text-decoration: none; color: inherit;">Анализ по товару/услуге</a>
+        </div>
+    </div>
+
+
+
+    <div class="container">
+        <div class="form-container">
+            <h1>Новая сделка</h1>
+            <form method="post" id="deal-form" class="form-horizontal">
+                {% csrf_token %}
+                {{ form.non_field_errors }}
+                {% for field in form %}
+                    <div class="form-row">
+                        {{ field.label_tag }}
+                        {{ field }}
+                        {% if field.errors %}
+                            <div class="errorlist">{{ field.errors }}</div>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+                <button type="submit" id="submit-button">Сохранить</button>
+            </form>
+        </div>
+
+        <div class="history-container" id="history">
+            <h2>История сделок за смену</h2>
+            {% if deals %}
+                {% for deal in deals %}
+                    <div class="history-item">
+                        <p><strong>Сделка #{{ deal.id }}</strong><br>
+                        Сотрудник: {{ deal.personal }}<br>
+                        Вид: {{ deal.services }}<br>
+                        Услуга/Товар: {{ deal.service }}<br>
+                        Оплата: {{ deal.maney }} руб.<br>
+                        Кому: {{ deal.whom }}<br>
+                        Дата: {{ deal.date_time|date:"d.m.Y H:i" }}</p>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p>Нет сделок за смену</p>
+            {% endif %}
+        </div>
+    </div>
+    <script>
+        // Получение CSRF-токена
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        // Настройка CSRF для AJAX
+        $.ajaxSetup({
+            beforeSend: function(xhr, settings) {
+                if (!/^(GET|HEAD|OPTIONS|TRACE)$/i.test(settings.type) && !this.crossDomain) {
+                    xhr.setRequestHeader("X-CSRFToken", getCookie('csrftoken'));
+                }
+            }
+        });
+
+        // Функция для загрузки сервисов
+        function loadServices(servicesId) {
+            console.log("Загрузка сервисов для категории ID:", servicesId);
+
+            $("#id_service").empty();
+            $("#id_service").append('<option value="">---------</option>');
+
+            if (servicesId) {
+                // AJAX-запрос для получения сервисов
+                $.ajax({
+                    url: "{% url 'get_services' %}",
+                    type: "GET",
+                    data: {
+                        'services_id': servicesId
+                    },
+                    dataType: 'json',
+                    success: function(data) {
+                        console.log("Ответ от сервера:", data);
+                        if (data.status === 'success') {
+                            $.each(data.services, function(index, service) {
+                                $("#id_service").append(
+                                    $('<option>').val(service.id).text(service.name)
+                                );
+                            });
+                            console.log("Сервисы загружены, количество:", data.count);
+                            checkFormValidity(); // Проверяем валидность после загрузки
+                        } else {
+                            console.log("Ошибка от сервера:", data.message || data.status);
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error("Ошибка AJAX:", status, error);
+                        console.error("Статус ответа:", xhr.status);
+                        console.error("Текст ответа:", xhr.responseText);
+                    }
+                });
+            } else {
+                console.log("Нет выбранной категории, сервисы не загружаются.");
+                checkFormValidity();
+            }
+        }
+
+        function checkFormValidity() {
+            const fields = [
+                '#id_personal',
+                '#id_services',
+                '#id_service',
+                '#id_payment',
+                '#id_whom',
+                '#id_maney'
+            ];
+            let isValid = true;
+
+            fields.forEach(function(fieldId) {
+                const field = $(fieldId);
+                if (!field.val() || field.val() === "") {
+                    isValid = false;
+                    field.css('border-color', '#ff4444');
+                } else {
+                    field.css('border-color', '#ddd');
+                }
+            });
+
+            $('#submit-button').prop('disabled', !isValid);
+        }
+
+        $(document).ready(function() {
+            console.log("jQuery подключен. Версия:", $.fn.jquery);
+            $('#id_personal, #id_services, #id_service, #id_payment, #id_whom, #id_maney').prop('required', true);
+            $('#deal-form input, #deal-form select').on('change input', function() {
+                checkFormValidity();
+            });
+            $("#id_services").change(function() {
+                var servicesId = $(this).val();
+                loadServices(servicesId);
+            });
+            var initialServicesId = $("#id_services").val();
+            loadServices(initialServicesId);
+            checkFormValidity();
+        });
+    </script>
+</body>
+</html>
+

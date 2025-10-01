@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>История сделок</title>
+    {% load static %}
+
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
+
+        .buttons-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            display: flex;
+            gap: 10px;
+            padding: 10px 25px;
+            background-color: rgba(255, 255, 255, 0.95);
+            border-bottom: 2px solid #ddd;
+            z-index: 1000;
+        }
+
+        .menu-button {
+            padding: 10px 20px;
+            background-color: white;
+            color: black;
+            border: 2px solid black;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .menu-button:hover {
+            background-color: #f0f0f0;
+            border-color: #333;
+        }
+
+        @media (max-width: 768px) {
+            .buttons-container {
+                flex-direction: column;
+                padding: 10px;
+            }
+            .menu-button {
+                padding: 8px 16px;
+                font-size: 14px;
+            }
+        }
+
+        .filter-form {
+            margin: 80px auto 20px;
+            max-width: 800px;
+            background: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+        }
+
+        .filter-form h2 {
+            margin-bottom: 15px;
+        }
+
+        .filter-form label {
+            margin-right: 10px;
+        }
+
+        .filter-form input {
+            margin-right: 20px;
+            padding: 5px;
+        }
+
+        .filter-form button {
+            padding: 8px 16px;
+            background-color: #333;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .filter-form button:hover {
+            background-color: #0056b3;
+        }
+
+        .totals-container {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .history-container {
+            max-width: 800px;
+            margin: 20px auto 40px;
+            padding: 20px;
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
+            background-color: #f0f0f0;
+        }
+
+        tr:hover {
+            background-color: #f9f9f9;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Меню -->
+    <div class="buttons-container">
+        <div class="menu-button"><a href="{% url 'index' %}" style="text-decoration: none; color: inherit;">Главная страница</a></div>
+        <div class="menu-button"><a href="{% url 'history' %}" style="text-decoration: none; color: inherit;">Расчет</a></div>
+        <div class="menu-button"><a href="{% url 'history' %}" style="text-decoration: none; color: inherit;">Расчет по сотруднику</a></div>
+        <div class="menu-button"><a href="{% url 'history' %}" style="text-decoration: none; color: inherit;">Расчет по товару</a></div>
+    </div>
+
+    <!-- Форма фильтра -->
+    <form method="get" class="filter-form">
+        <h2>Фильтр по дате и времени</h2>
+        <label for="start">Начало:</label>
+        <input type="datetime-local" id="start" name="start" value="{{ request.GET.start }}">
+        <label for="end">Конец:</label>
+        <input type="datetime-local" id="end" name="end" value="{{ request.GET.end }}">
+        <button type="submit">Фильтровать</button>
+    </form>
+
+
+    {% if calc %}
+    <div class="totals-container">
+        <h2>Общие итоги</h2>
+        <p><strong>Доход с услуг:</strong> {{ calc.service_u }} руб.</p>
+        <p><strong>Доход с товаров:</strong> {{ calc.service_t }} руб.</p>
+        <p><strong>Общий доход:</strong> {{ calc.total }} руб.</p>
+    </div>
+    {% endif %}
+
+
+    <div class="history-container">
+        <h2>История сделок</h2>
+        {% if post %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Услуга/Товар</th>
+                        <th>Дата</th>
+                        <th>Цена</th>
+                        <th>Роль</th>
+                        <th>Сотрудник</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for deal in post %}
+                        <tr>
+                            <td>{{ deal.id }}</td>
+                            <td>{{ deal.service }}</td>
+                            <td>{{ deal.date_time|date:"d.m.Y H:i" }}</td>
+                            <td>{{ deal.maney }} руб.</td>
+                            <td>{{ deal.personal.role.name }}</td>
+                            <td>{{ deal.personal.name }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>Нет сделок за выбранный период</p>
+        {% endif %}
+    </div>
+
+</body>
+</html>
