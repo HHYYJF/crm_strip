@@ -156,6 +156,13 @@
         <div class="menu-button">
             <a href="{% url 'calculation_products' %}" style="text-decoration: none; color: inherit;">Анализ по товару/услуге</a>
         </div>
+
+        <div class="menu-button">
+            <a href="{% url 'history_smen' %}" style="text-decoration: none; color: inherit;">История смен</a>
+        </div>
+         <div class="menu-button">
+            <a href="{% url 'logout_view' %}" style="text-decoration: none; color: inherit;">Выход</a>
+        </div>
     </div>
 
 
@@ -163,20 +170,63 @@
     <div class="container">
         <div class="form-container">
             <h1>Новая сделка</h1>
-            <form method="post" id="deal-form" class="form-horizontal">
-                {% csrf_token %}
-                {{ form.non_field_errors }}
-                {% for field in form %}
+                <form method="post" id="deal-form" class="form-horizontal">
+                    {% csrf_token %}
+
+                    {{ form.non_field_errors }}
+
+                    <!-- Потом "Вид" -->
                     <div class="form-row">
-                        {{ field.label_tag }}
-                        {{ field }}
-                        {% if field.errors %}
-                            <div class="errorlist">{{ field.errors }}</div>
+                        {{ form.services.label_tag }}
+                        {{ form.services }}
+                        {% if form.services.errors %}
+                            <div class="errorlist">{{ form.services.errors }}</div>
                         {% endif %}
                     </div>
-                {% endfor %}
-                <button type="submit" id="submit-button">Сохранить</button>
-            </form>
+                                        <!-- Потом "Вид услуги/товара" -->
+                    <div class="form-row">
+                        {{ form.service.label_tag }}
+                        {{ form.service }}
+                        {% if form.service.errors %}
+                            <div class="errorlist">{{ form.service.errors }}</div>
+                        {% endif %}
+                    </div>
+                    <!-- Потом "Кому оказывалась услуга" -->
+                    <div class="form-row">
+                        {{ form.whom.label_tag }}
+                        {{ form.whom }}
+                        {% if form.whom.errors %}
+                            <div class="errorlist">{{ form.whom.errors }}</div>
+                        {% endif %}
+                    </div>
+                     <!-- Потом "Исполнитель" -->
+                    <div class="form-row">
+                        {{ form.personal.label_tag }}
+                        {{ form.personal }}
+                        {% if form.personal.errors %}
+                            <div class="errorlist">{{ form.personal.errors }}</div>
+                        {% endif %}
+                    </div>
+                    <!-- Потом "Вид оплаты" -->
+                    <div class="form-row">
+                        {{ form.payment.label_tag }}
+                        {{ form.payment }}
+                        {% if form.payment.errors %}
+                            <div class="errorlist">{{ form.payment.errors }}</div>
+                        {% endif %}
+                    </div>
+                    <!-- Сначала поле "Оплата" -->
+                    <div class="form-row">
+                        {{ form.maney.label_tag }}
+                        {{ form.maney }}
+                        {% if form.maney.errors %}
+                            <div class="errorlist">{{ form.maney.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <button type="submit" id="submit-button">Сохранить</button>
+                </form>
+
         </div>
 
         <div class="history-container" id="history">

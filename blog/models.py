@@ -67,7 +67,7 @@ class Whom(models.Model):
         verbose_name_plural = "Кому оказана услуга"
 
 class Deal(models.Model):
-    personal = models.ForeignKey(Personal, on_delete=models.CASCADE, blank=True, null=True, verbose_name="Имя сотрудника")
+    personal = models.ForeignKey(Personal, on_delete=models.CASCADE, blank=True, null=True, verbose_name="Исполнитель")
     services = models.ForeignKey(Services, on_delete=models.CASCADE, blank=True, null=True, verbose_name="Вид")
     service = models.ForeignKey(
         Service,
@@ -80,6 +80,7 @@ class Deal(models.Model):
     whom = models.ForeignKey(Whom, on_delete=models.CASCADE, blank=True, null=True, verbose_name="Кому оказывалась услуга")
     maney = models.PositiveSmallIntegerField(default=0, verbose_name="Оплата")
     date_time = models.DateTimeField(auto_now_add=True, verbose_name="Дата и время")
+    ais = models.BooleanField(default=True,verbose_name="Закрыты/открыты записи")
 
     def __str__(self):
         return f"#{self.id} {self.personal} {self.service}"
@@ -87,3 +88,17 @@ class Deal(models.Model):
     class Meta:
         verbose_name = "Сделка"
         verbose_name_plural = "Сделки"
+
+class Shift(models.Model):
+    admin = models.ForeignKey("Personal", on_delete=models.SET_NULL, null=True, related_name="shifts_as_admin", verbose_name="Администратор")
+    barman = models.ForeignKey("Personal",  on_delete=models.SET_NULL, null=True, related_name="shifts_as_barman",verbose_name="Бармен")
+    start_time = models.DateTimeField(auto_now_add=True, verbose_name="Начало смены")
+    end_time = models.DateTimeField(blank=True, null=True, verbose_name="Окончание смены")
+    is_active = models.BooleanField(default=True, verbose_name="Активная смена")
+    def __str__(self):
+        return f"Смена #{self.id}: {self.admin} и {self.barman} ({'активна' if self.is_active else 'закрыта'})"
+    class Meta:
+        verbose_name = "Смена"
+        verbose_name_plural = "Смены"
+
+

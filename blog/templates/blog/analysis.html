@@ -1,106 +1,123 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <title>Анализ по сотруднику</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    .controls { margin-bottom: 20px; }
-    .controls input, .controls select, .controls button {
-      margin-right: 10px; padding: 5px 10px;
-    }
-    #chartWrap { width: 800px; height: 500px; }
-  </style>
+<meta charset="UTF-8">
+<title>Анализ по сотруднику</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  body { font-family: Arial, sans-serif; margin: 20px; }
+  h2 { text-align: center; }
+
+  .controls { margin-bottom: 30px; text-align: center; }
+  .controls input, .controls select, .controls button {
+      margin: 0 5px; padding: 5px 10px;
+  }
+
+  #chartWrap {
+      width: 80%;
+      max-width: 800px;
+      height: 500px;
+      margin: 0 auto 40px auto; /* по центру и отступ снизу */
+      background: #f9f9f9;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  }
+
+  .service-summary { width: 80%; max-width: 800px; margin: 0 auto; }
+  .service-summary table { width: 100%; border-collapse: collapse; }
+  .service-summary th, .service-summary td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+  .service-summary th { background-color: #eee; }
+</style>
 </head>
 <body>
-  <h2>Анализ по сотруднику</h2>
 
-  <div class="controls">
-    <label>Дата от: <input type="date" id="start"></label>
-    <label>Дата до: <input type="date" id="end"></label>
+<h2>Анализ по сотруднику</h2>
+
+<div class="controls">
+  <form method="post">
+    {% csrf_token %}
+    <label>Дата от: <input type="date" name="start" required></label>
+    <label>Дата до: <input type="date" name="end" required></label>
     <label>Сотрудник:
-      <select id="personal">
+      <select name="personal" required>
         <option value="">-- выберите --</option>
         {% for p in personals %}
-          <option value="{{ p.id }}">{{ p.name }}</option>
+          <option value="{{ p.id }}" {% if selected_personal and selected_personal.id == p.id %}selected{% endif %}>
+            {{ p.name }}
+          </option>
         {% endfor %}
       </select>
     </label>
-    <button id="analyzeBtn">Анализ</button>
-  </div>
+    <button type="submit">Анализ</button>
+  </form>
+</div>
 
-  <div id="chartWrap">
-    <canvas id="analysisChart"></canvas>
-  </div>
+<div id="chartWrap">
+  <canvas id="analysisChart"></canvas>
+</div>
 
-  <script>
-    const csrftoken = "{{ csrf_token }}";
-    let chart = null;
+<div class="service-summary">
+    <h3>Результаты</h3>
+    {% if summary %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Услуга</th>
+                    <th>Даты</th>
+                    <th>Итого</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in summary %}
+                <tr>
+                    <td>{{ s.name }}</td>
+                    <td>
+                        {% for d in s.dates %}
+                            {{ d }}{% if not forloop.last %}, {% endif %}
+                        {% endfor %}
+                    </td>
+                    <td>{{ s.total }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>Нет данных за выбранный период.</p>
+    {% endif %}
+</div>
 
-    document.getElementById("analyzeBtn").addEventListener("click", async () => {
-      const start = document.getElementById("start").value;
-      const end = document.getElementById("end").value;
-      const personal = document.getElementById("personal").value;
+<script>
+const labels = {{ chart_data.labels|safe }};
+const counts = {{ chart_data.counts|safe }};
 
-      if (!start || !end || !personal) {
-        alert("Заполните все поля!");
-        return;
-      }
-
-      const formData = new FormData();
-      formData.append("start", start);
-      formData.append("end", end);
-      formData.append("personal", personal);
-
-      const resp = await fetch("{% url 'analysis_api' %}", {
-        method: "POST",
-        headers: {"X-CSRFToken": csrftoken},
-        body: formData
-      });
-
-      if (!resp.ok) {
-        alert("Ошибка: " + (await resp.text()));
-        return;
-      }
-
-      const data = await resp.json();
-      renderChart(data);
-    });
-
-    function renderChart(data) {
-      const labels = data.services.map(s => s.name);
-      const counts = data.services.map(s => s.count);
-
-      const ctx = document.getElementById("analysisChart").getContext("2d");
-      if (chart) chart.destroy();
-
-      chart = new Chart(ctx, {
-        type: "bar",
-        data: {
-          labels: labels,
-          datasets: [{
-            label: "Количество услуг (" + data.personal + ")",
+const ctx = document.getElementById("analysisChart").getContext("2d");
+const chart = new Chart(ctx, {
+    type: "bar",
+    data: {
+        labels: labels,
+        datasets: [{
+            label: "Количество услуг",
             data: counts,
             backgroundColor: "#3b82f6"
-          }]
-        },
-        options: {
-          responsive: true,
-          plugins: {
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
             title: {
-              display: true,
-              text: "Популярность услуг у сотрудника " + data.personal
+                display: true,
+                text: "Популярность услуг {% if selected_personal %}{{ selected_personal.name }}{% endif %}"
             },
             legend: { display: false }
-          },
-          scales: {
+        },
+        scales: {
             y: { beginAtZero: true, title: { display: true, text: "Количество" } },
             x: { title: { display: true, text: "Услуга" } }
-          }
         }
-      });
     }
-  </script>
+});
+</script>
+
 </body>
 </html>

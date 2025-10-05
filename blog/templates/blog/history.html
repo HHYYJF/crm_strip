@@ -1,9 +1,11 @@
 <!DOCTYPE html>
+{% load l10n %}
+{% load static %}
+
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
     <title>История сделок</title>
-    {% load static %}
 
     <style>
         body {
@@ -149,9 +151,17 @@
 
     {% if calc %}
     <div class="totals-container">
-        <h2>Общие итоги</h2>
+
+        <h2>Общие итоги {{ calc.start }} - {{ calc.stop }}</h2>
+
         <p><strong>Доход с услуг:</strong> {{ calc.service_u }} руб.</p>
         <p><strong>Доход с товаров:</strong> {{ calc.service_t }} руб.</p>
+        <p> __________________________________________________________________________________________ </p>
+                {% for pay_type, amount in calc.payments.items %}
+            <p><strong>{{ pay_type }}:</strong> {{ amount }} руб.</p>
+        {% endfor %}
+        <p> __________________________________________________________________________________________ </p>
+
         <p><strong>Общий доход:</strong> {{ calc.total }} руб.</p>
     </div>
     {% endif %}
