@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from django.db import models
 
 class Role(models.Model):
@@ -5,7 +7,9 @@ class Role(models.Model):
     params_one = models.BooleanField(default=False, verbose_name="Доход с услуг")
     params_two = models.BooleanField(default=False, verbose_name="Доход с товара")
     params_fre = models.BooleanField(default=False, verbose_name="Учитывание в истории")
+    params_data = models.BooleanField(default=False, verbose_name="Продление смены")
     maney = models.PositiveSmallIntegerField(default=0, verbose_name="% с дохода")
+    maney_a = models.PositiveSmallIntegerField(default=0, verbose_name="% при оказании усдуги админом/барменом")
 
     def __str__(self):
         return self.name
@@ -36,7 +40,7 @@ class Services(models.Model):
         verbose_name_plural = "Виды"
 
 class Service(models.Model):
-    name = models.CharField(max_length=64, verbose_name="Вид услуги/товара")
+    name = models.CharField(max_length=64, verbose_name="название")
     service = models.ForeignKey(Services, on_delete=models.CASCADE, blank=True, null=True, verbose_name="Вид услуги/товара")
 
     def __str__(self):
@@ -90,8 +94,8 @@ class Deal(models.Model):
         verbose_name_plural = "Сделки"
 
 class Shift(models.Model):
-    admin = models.ForeignKey("Personal", on_delete=models.SET_NULL, null=True, related_name="shifts_as_admin", verbose_name="Администратор")
-    barman = models.ForeignKey("Personal",  on_delete=models.SET_NULL, null=True, related_name="shifts_as_barman",verbose_name="Бармен")
+    admin = models.ForeignKey(Personal, on_delete=models.SET_NULL, null=True, related_name="shifts_as_admin", verbose_name="Администратор")
+    barman = models.ForeignKey(Personal,  on_delete=models.SET_NULL, null=True, related_name="shifts_as_barman",verbose_name="Бармен")
     start_time = models.DateTimeField(auto_now_add=True, verbose_name="Начало смены")
     end_time = models.DateTimeField(blank=True, null=True, verbose_name="Окончание смены")
     is_active = models.BooleanField(default=True, verbose_name="Активная смена")
@@ -101,4 +105,15 @@ class Shift(models.Model):
         verbose_name = "Смена"
         verbose_name_plural = "Смены"
 
-
+    def calculate_salary(self):
+        # Проверяем, есть ли продажи за смену
+        from .models import Deal  # Импорт Deal, если нужно
+        sales = Deal.objects.filter(date_time__range=(self.start_time, self.end_time or datetime.now()))
+        if sales.exists():
+            # Если есть продажи, возвращаем 0 или рассчитываем по логике (не указано в запросе)
+            return {'admin_salary': 0, 'barman_salary': 0}  # Или реализовать полный расчет
+        else:
+            # Нет продаж: по 500р каждому
+            admin_salary = 500 if self.admin else 0
+            barman_salary = 500 if self.barman else 0
+            return {'admin_salary': admin_salary, 'barman_salary': barman_salary}
