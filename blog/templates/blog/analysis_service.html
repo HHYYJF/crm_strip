@@ -123,58 +123,33 @@
 </head>
 <body>
 
-    <!-- Левое меню -->
-    <div class="buttons-container">
-        <div class="menu-button">
-            <a href="{% url 'index' %}" style="text-decoration: none; color: inherit;">Главная страница</a>
-        </div>
-        <div class="menu-button">
-            <a href="{% url 'calculation' %}" style="text-decoration: none; color: inherit;">Расчет</a>
-        </div>
-        <div class="menu-button">
-            <a href="{% url 'calculation' %}" style="text-decoration: none; color: inherit;">Расчет по сотруднику</a>
-        </div>
-        <div class="menu-button">
-            <a href="{% url 'calculation' %}" style="text-decoration: none; color: inherit;">Расчет по товару</a>
-        </div>
-    </div>
+
 
     <!-- Форма фильтра -->
     <form method="get" class="filter-form">
         <h2>Фильтр по дате и времени</h2>
         <label for="start">Начало:</label>
-        <input type="datetime-local" id="start" name="start" value="{{ request.GET.start }}">
+        <input type="datetime-local" id="start" name="start" value="{{ start }}">
         <label for="end">Конец:</label>
-        <input type="datetime-local" id="end" name="end" value="{{ request.GET.end }}">
+        <input type="datetime-local" id="end" name="end" value="{{ end }}">
         <button type="submit">Фильтровать</button>
     </form>
 
     <div class="history-container">
         <h2>История сделок</h2>
 
-        {% if not request.GET.start or not request.GET.end %}
-            <p>Нет данных для запроса</p>
+        {% if maser %}
+            {% for deal in maser %}
+                <div class="product">
+                    <span>{{ forloop.counter }}. {{ deal.service.name }}</span>
+                    <span>{{ deal.maney }} ₽ | {{ deal.date_time|date:"d.m.Y H:i" }}</span>
+                </div>
+            {% endfor %}
+            <div class="summary">
+                <strong>Итоговая сумма: {{ total_sum }} ₽</strong>
+            </div>
         {% else %}
-            {% if masters %}
-                {% for master in masters %}
-                    <div class="product-list">
-                        {% for deal in master.deals %}
-                            <div class="product">
-                                <span>{{ forloop.counter }}. {{ deal.name }}</span>
-                                <span>{{ deal.price }} ₽ | {{ deal.datetime }}</span>
-                            </div>
-                        {% endfor %}
-                        <div class="summary">
-                            Итог: {{ master.name }}, {{ master.income }} ₽ | {{ master.sum_income }} ₽ (чистый доход)
-                        </div>
-                    </div>
-                    {% if not forloop.last %}
-                        <div class="separator"></div>
-                    {% endif %}
-                {% endfor %}
-            {% else %}
-                <p>Нет сделок за выбранный период</p>
-            {% endif %}
+            <p>Нет сделок за выбранный период</p>
         {% endif %}
     </div>
 

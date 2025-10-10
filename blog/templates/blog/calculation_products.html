@@ -102,21 +102,7 @@ applyBtn.addEventListener('click', async ()=>{
   if(!start || !end){alert('Укажите обе даты'); return;}
   applyBtn.disabled=true; applyBtn.textContent='Загрузка...';
 
-  try{
-    const formData = new FormData();
-    formData.append('start', start);
-    formData.append('end', end);
-    selected.forEach(s=>formData.append('products[]',s));
 
-    const resp = await fetch("{% url 'aggregate_products_api' %}",{
-      method:'POST', headers:{'X-CSRFToken':csrftoken}, body:formData
-    });
-    if(!resp.ok){throw new Error('Ошибка сервера: '+await resp.text());}
-    const data = await resp.json();
-    handleResponse(data);
-  }catch(err){alert('Ошибка: '+err.message);}
-  finally{applyBtn.disabled=false; applyBtn.textContent='Применить';}
-});
 
 function handleResponse(data){
   // Проверка наличия данных
