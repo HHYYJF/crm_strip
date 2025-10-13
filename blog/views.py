@@ -1,58 +1,21 @@
-from django.shortcuts import render
 from rest_framework.decorators import api_view
 from django.db import models
 from django.contrib.auth import authenticate
 from rest_framework.authtoken.models import Token
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from rest_framework.authentication import TokenAuthentication
-from rest_framework.permissions import IsAuthenticated
-from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample, OpenApiResponse
-from django.db.models import Sum, Q
-from django.utils.dateparse import parse_datetime
-from .models import Deal, Role, Services, Payment
-from .serializers import DealSerializer
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.authentication import TokenAuthentication
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from .models import Shift, Personal, Role
-from .serializers import ShiftCreateSerializer, PersonalSerializer,LoginSerializer
-from .serializers import DealSerializer, PersonalSerializer,ShiftCreateSerializer,LoginSerializer
-from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
-from .models import Shift
-from .serializers import ShiftSerializer
+from .serializers import ShiftCreateSerializer, LoginSerializer, PersonalSerializer
 from .models import Deal, Personal, Services, Service, Payment, Whom, Role, Shift
-from .serializers import (DealSerializer, PersonalSerializer, ServicesSerializer,
-                          ServiceSerializer, PaymentSerializer, WhomSerializer,
-                          RoleSerializer, ShiftSerializer)
+from rest_framework.authentication import TokenAuthentication
+from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
+from django.shortcuts import render
+from django.http import JsonResponse
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.authentication import TokenAuthentication
-from rest_framework.permissions import IsAuthenticated
-from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample, OpenApiResponse
-from django.db.models import Q
 from django.utils.dateparse import parse_datetime
-from .models import Service, Deal
-from .serializers import ServiceSerializer, DealSerializer
 
-from .models import Personal, Deal, Shift
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from rest_framework.authentication import TokenAuthentication
-from rest_framework.permissions import IsAuthenticated
-from .models import Deal, Personal
-from .serializers import DealSerializer
-from django.db.models import Q
-
-
-
-
+posts = []
+users = []
 @api_view(['POST'])
 def login_view(request):
     serializer = LoginSerializer(data=request.data)
@@ -125,76 +88,8 @@ class IndexAPIView(APIView):
 
         return Response({
             "admins": admin_data,
-            "barmans": barman_data
+            "bartenders": barman_data
         })
-
-
-class DealView(APIView):
-    # authentication_classes = [TokenAuthentication]
-    # permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        # Fetch all Deal records where ais=True
-        deals = Deal.objects.filter(ais=True)
-        deal_serializer = DealSerializer(deals, many=True)
-
-        # Fetch all records for other models
-        roles = Role.objects.all()
-        personals = Personal.objects.all()
-        services = Services.objects.all()
-        service_items = Service.objects.all()
-        payments = Payment.objects.all()
-        whoms = Whom.objects.all()
-
-
-        # Serialize all models
-        role_serializer = RoleSerializer(roles, many=True)
-        personal_serializer = PersonalSerializer(personals, many=True)
-        services_serializer = ServicesSerializer(services, many=True)
-        service_serializer = ServiceSerializer(service_items, many=True)
-        payment_serializer = PaymentSerializer(payments, many=True)
-        whom_serializer = WhomSerializer(whoms, many=True)
-
-        response_data = {
-            'deals': deal_serializer.data,
-            'roles': role_serializer.data,
-            'personals': personal_serializer.data,
-            'services': services_serializer.data,
-            'service_items': service_serializer.data,
-            'payments': payment_serializer.data,
-            'whoms': whom_serializer.data,
-        }
-
-        return Response(response_data, status=status.HTTP_200_OK)
-
-    def post(self, request):
-        serializer = DealSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            all_deals = Deal.objects.all()
-            all_serializer = DealSerializer(all_deals, many=True)
-            return Response(all_serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-class ServiceListView(APIView):
-    # authentication_classes = [TokenAuthentication]
-    # permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        services_id = request.query_params.get('services_id')
-        if services_id:
-            services = Service.objects.filter(service_id=services_id)
-        else:
-            services = Service.objects.all()
-        serializer = ServiceSerializer(services, many=True)
-        return Response({
-            'status': 'success',
-            'services': serializer.data,
-            'count': services.count()
-        }, status=status.HTTP_200_OK)
-
-
 
 class LogoutView(APIView):
     authentication_classes = [TokenAuthentication]
@@ -233,494 +128,514 @@ class LogoutView(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-class ShiftView(APIView):
-    # authentication_classes = [TokenAuthentication]
-    # permission_classes = [IsAuthenticated]
+class DealAPIView(APIView):
+    """Создание и получение сделок"""
 
     def get(self, request):
-        shifts = Shift.objects.all()
-        serializer = ShiftSerializer(shifts, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-
-
-
-
-class DealHistoryView(APIView):
-    # authentication_classes = [TokenAuthentication]
-    # permission_classes = [IsAuthenticated]
-
-    @extend_schema(
-        summary='Получить все сделки без фильтра',
-        description='Возвращает пустой ответ или все сделки без фильтрации (просто страницу без всего).',
-        responses={
-            200: OpenApiResponse(description='Пустой ответ'),
-            401: OpenApiResponse(description='Неавторизован'),
-        }
-    )
-    def get(self, request):
-        # Возвращаем пустой ответ для GET, как указано ("страницу без всего")
-        return Response({}, status=status.HTTP_200_OK)
-
-    @extend_schema(
-        summary='Фильтровать сделки по датам и рассчитывать аггрегаты',
-        description='Принимает даты "от" и "до", фильтрует сделки по date_time, возвращает их и аггрегаты: доход с услуг, с товаров, по видам оплаты, заработок ролей.',
-        parameters=[
-            OpenApiParameter(name='from_date', type=str, required=True, description='Дата от (формат: YYYY-MM-DDTHH:MM:SS+03:00)'),
-            OpenApiParameter(name='to_date', type=str, required=True, description='Дата до (формат: YYYY-MM-DDTHH:MM:SS+03:00)'),
-        ],
-        request=None,  # POST без тела, параметры в query или form, но используем POST с JSON
-        responses={
-            200: OpenApiResponse(
-                description='Фильтрованные сделки и аггрегаты',
-                examples=[
-                    OpenApiExample(
-                        'Пример ответа',
-                        value={
-                            'deals': [
-                                {'id': 1, 'maney': 1000, 'services': {'name': 'услуга'}, 'payment': {'name': 'карта'}, 'personal': {'role': {'name': 'Бармен', 'maney': 10}}},
-                            ],
-                            'aggregates': {
-                                'income_services': 5000,
-                                'income_goods': 3000,
-                                'payments': {'карта': 4000, 'наличные': 4000},
-                                'roles_earnings': {'Бармен': 500, 'Официант': 300},
-                            }
-                        }
-                    )
-                ]
-            ),
-            400: OpenApiResponse(description='Неверные даты'),
-            401: OpenApiResponse(description='Неавторизован'),
-        }
-    )
-    def post(self, request):
-        from_date_str = request.data.get('from_date')
-        to_date_str = request.data.get('to_date')
-        if not from_date_str or not to_date_str:
-            return Response({'error': 'Требуются from_date и to_date'}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            from_date = parse_datetime(from_date_str)
-            to_date = parse_datetime(to_date_str)
-            if not from_date or not to_date:
-                raise ValueError
-        except ValueError:
-            return Response({'error': 'Неверный формат дат'}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Фильтруем сделки по датам
-        deals = Deal.objects.filter(date_time__range=(from_date, to_date))
-        serializer = DealSerializer(deals, many=True)
-
-        # Рассчитываем аггрегаты
-        aggregates = self.calculate_aggregates(deals)
-
-        response_data = {
-            'deals': serializer.data,
-            'aggregates': aggregates
-        }
-
-        return Response(response_data, status=status.HTTP_200_OK)
-
-    def calculate_aggregates(self, deals):
-        # Доход с услуг (services.name == 'услуга')
-        income_services = deals.filter(services__name='услуга').aggregate(total=Sum('maney'))['total'] or 0
-
-        # Доход с товаров (services.name == 'товар')
-        income_goods = deals.filter(services__name='товар').aggregate(total=Sum('maney'))['total'] or 0
-
-        # По видам оплаты (группировка по payment.name, sum maney)
-        payments = {}
-        for payment in Payment.objects.all():
-            payments[payment.name] = deals.filter(payment=payment).aggregate(total=Sum('maney'))['total'] or 0
-
-        # Заработок ролей
-        roles_earnings = {}
-        for role in Role.objects.all():
-            # Сотрудники с этой ролью
-            personals = Personal.objects.filter(role=role)
-            role_deals = deals.filter(personal__in=personals)
-
-            earnings = 0
-            if role.params_one:
-                earnings += income_services * (role.maney / 100)
-            if role.params_two:
-                earnings += income_goods * (role.maney / 100)
-            roles_earnings[role.name] = earnings
-
-        return {
-            'income_services': income_services,
-            'income_goods': income_goods,
-            'payments': payments,
-            'roles_earnings': roles_earnings,
-        }
-
-
-class ProductServiceAnalysisView(APIView):
-    # authentication_classes = [TokenAuthentication]
-    # permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        services = Service.objects.all()
-        serializer = ServiceSerializer(services, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-    def post(self, request):
-        service_ids = request.data.get('service_ids', [])
-        from_date_str = request.data.get('from_date')
-        to_date_str = request.data.get('to_date')
-
-        if not service_ids or not from_date_str or not to_date_str:
-            return Response({'error': 'Требуются service_ids, from_date и to_date'}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            from_date = parse_datetime(from_date_str)
-            to_date = parse_datetime(to_date_str)
-            if not from_date or not to_date:
-                raise ValueError
-        except ValueError:
-            return Response({'error': 'Неверный формат дат'}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Фильтруем сделки по service_ids и датам
-        deals = Deal.objects.filter(
-            service__id__in=service_ids,
-            date_time__range=(from_date, to_date)
+        # 1️⃣ Активные сделки
+        active_deals = Deal.objects.filter(ais=True).select_related(
+            "personal", "services", "service", "payment", "whom"
         )
-        serializer = DealSerializer(deals, many=True)
 
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        deals_data = [
+            {
+                "id": d.id,
+                "personal": d.personal.name if d.personal else None,
+                "personal_id": d.personal.id if d.personal else None,
+                "service_type": "товар" if d.services and d.services.is_tovar else "услуга" if d.services else None,
+                "service": d.service.name if d.service else None,
+                "service_id": d.service.id if d.service else None,
+                "payment": d.payment.name if d.payment else None,
+                "payment_id": d.payment.id if d.payment else None,
+                "whom": d.whom.name if d.whom else None,
+                "whom_id": d.whom.id if d.whom else None,
+                "maney": d.maney,
+                "date_time": d.date_time.strftime("%Y-%m-%d %H:%M"),
+            }
+            for d in active_deals
+        ]
 
+        personals = list(Personal.objects.values("id", "name"))
+        services_types = list(Services.objects.values("id", "is_tovar", "is_uslyga"))
+        services = list(Service.objects.values("id", "name"))
+        payments = list(Payment.objects.values("id", "name"))
+        whoms = list(Whom.objects.values("id", "name"))
 
-# class IncomeCalculation(APIView):
-#     # authentication_classes = [TokenAuthentication]
-#     # permission_classes = [IsAuthenticated]
+        return Response({
+            "deals": deals_data,
+            "meta": {
+                "personals": personals,
+                "services_types": services_types,
+                "services": services,
+                "payments": payments,
+                "whoms": whoms,
+            }
+        })
 
-from django.shortcuts import render
-from datetime import datetime
-from django.db.models import Q
-from .models import Deal, Shift
-from collections import defaultdict
-
-def calculation_products(request):
-    start_str = request.GET.get('start')
-    end_str = request.GET.get('end')
-    deals = []
-    result = []
-
-    if start_str and end_str:
+    def post(self, request):
+        """Создание новой сделки"""
+        data = request.data
         try:
-            start_date = datetime.strptime(start_str, "%Y-%m-%dT%H:%M")
-            end_date = datetime.strptime(end_str, "%Y-%m-%dT%H:%M")
-            deals = Deal.objects.filter(date_time__range=(start_date, end_date)).select_related(
-                "personal", "service"
+            deal = Deal.objects.create(
+                personal_id=data.get("personal_id"),
+                services_id=data.get("services_id"),
+                service_id=data.get("service_id"),
+                payment_id=data.get("payment_id"),
+                whom_id=data.get("whom_id"),
+                maney=data.get("maney", 0),
+                date_time=timezone.now(),
+                ais=True
             )
-            filter_zp(deals)
-        except ValueError as e:
-            print(f"Ошибка формата даты: {e}")
 
-    context = {
-        "result": result,
-        "start": start_str,
-        "end": end_str,
-    }
-    return render(request, "blog/analysis_service.html", context)
+            return Response({
+                "message": "Сделка успешно создана",
+                "deal_id": deal.id
+            }, status=status.HTTP_201_CREATED)
 
-from collections import defaultdict
-from django.db.models import Q
-from .models import Shift
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-# def filter_zp(start_date, end_date, deals, result):
-#     daily_services = defaultdict(list)
-#
-#     for deal in deals:
-#         # --- Определяем активную смену ---
-#         shift = (
-#             Shift.objects.filter(
-#                 Q(start_time__lte=deal.date_time),
-#                 Q(end_time__gte=deal.date_time) | Q(end_time__isnull=True)
-#             )
-#             .order_by('-start_time')
-#             .first()
-#         )
-#
-#         role = getattr(deal.personal, 'role', None)
-#
-#         # --- Собираем инфо по сделке ---
-#         info = {
-#             'personal': deal.personal.name if deal.personal else '-',
-#             'admin': shift.admin.name if shift and shift.admin else '-',
-#             'barman': shift.barman.name if shift and shift.barman else '-',
-#             'shift_id': shift.id if shift else '-',
-#             'date': deal.date_time.date(),
-#             'service': deal.service.name if deal.service else '-',
-#             'type': deal.services.name.lower() if deal.services else '',
-#             'price': deal.maney or 0,
-#             'role_obj': role,  # оставим для расчета %
-#             'shift': shift,    # добавляем shift для расчета %
-#         }
-#
-#         daily_services[info['date']].append(info)
-#         result.append(info)
-#
-#     # --- Итог по дням ---
-#     for day, deals_info in sorted(daily_services.items()):
-#         print(f"\n📅 В период {day}:")
-#         total_admin = 0
-#         total_barman = 0
-#
-#         for d in deals_info:
-#             price = d['price']
-#             personal = d['personal']
-#             service_type = d['type']
-#             shift = d['shift']
-#
-#             salary = 0
-#             role_view = ""
-#
-#             # Определяем проценты
-#             admin_role_percent = shift.admin.role.maney_a if shift and shift.admin and shift.admin.role else 0
-#             barman_role_percent = shift.barman.role.maney_a if shift and shift.barman and shift.barman.role else 0
-#             personal_percent = d['role_obj'].maney if d['role_obj'] else 0
-#
-#             # === Расчёт зарплаты ===
-#             if service_type == "услуга":
-#                 if personal == (shift.admin.name if shift and shift.admin else None):
-#                     # Исполнитель и админ — один человек
-#                     salary = price * 50 / 100
-#                     total_admin += salary
-#                     role_view = f"услуга — админ получил {salary:.2f}₽ ({admin_role_percent}%)"
-#                 elif personal == (shift.barman.name if shift and shift.barman else None):
-#                     # Исполнитель и бармен — один человек
-#                     salary = price * 50 / 100
-#                     total_barman += salary
-#                     role_view = f"услуга — бармен получил {salary:.2f}₽ ({barman_role_percent}%)"
-#                 else:
-#                     # Другой исполнитель
-#                     salary = price * personal_percent / 100
-#                     total_admin += salary
-#                     role_view = f"услуга — админу {salary:.2f}₽ ({personal_percent}%)"
-#
-#             elif service_type == "товар":
-#                 salary = price * personal_percent / 100
-#                 total_barman += salary
-#                 role_view = f"товар — бармену {salary:.2f}₽ ({personal_percent}%)"
-#
-#             print(
-#                 f"   • {d['service']} | Цена: {price}₽ | "
-#                 f"Исполнитель: {personal} | Админ: {d['admin']} | Бармен: {d['barman']} | "
-#                 f"СменаID: {d['shift_id']} | {role_view}"
-#             )
-#
-#         print(f"\n💰 ИТОГО за {day}:")
-#         print(f"   Зарплата админа: {round(total_admin, 2)}₽")
-#         print(f"   Зарплата бармена: {round(total_barman, 2)}₽")
-#         print("-" * 40)
+@api_view(['GET'])
+def histori(request):
+    """История всех смен (активных и закрытых)"""
+    shifts = Shift.objects.select_related("admin", "barman").order_by("-start_time")
 
-from collections import defaultdict
-from django.db.models import Q
-from .models import Deal, Shift
+    data = []
+    for s in shifts:
+        data.append({
+            "id": s.id,
+            "admin": s.admin.name if s.admin else None,
+            "barman": s.barman.name if s.barman else None,
+            "start_time": s.start_time.strftime("%Y-%m-%d %H:%M"),
+            "end_time": s.end_time.strftime("%Y-%m-%d %H:%M") if s.end_time else None,
+            "is_active": s.is_active
+        })
 
-from collections import defaultdict
-from django.db.models import Q
-from .models import Deal, Shift
+    return Response({"history": data})
 
-def filter_zp(deals):
-    earnings = defaultdict(lambda: {"earnings": 0, "services": [], "role": "", "name": ""})
-    total_revenue = 0
 
-    for deal in deals:
-        if not deal.personal:
-            continue
+class EmployeePerformanceView(APIView):
+    """
+    GET: возвращает всех сотрудников.
+    POST: фильтрует сделки по сотрудникам и дате/времени и возвращает анализ с детализацией.
+    """
 
-        personal = deal.personal
-        role = personal.role
-        service_type = deal.services.name.lower() if deal.services else ""
-        price = deal.maney or 0
+    def get(self, request):
+        employees = Personal.objects.all()
+        data = [
+            {
+                'id': e.id,
+                'name': e.name,
+                'role': e.role.name if e.role else None
+            }
+            for e in employees
+        ]
+        return Response({'employees': data})
 
-        # --- Определяем смену ---
-        shift = (
-            Shift.objects.filter(
-                Q(start_time__lte=deal.date_time),
-                Q(end_time__gte=deal.date_time) | Q(end_time__isnull=True)
-            ).order_by('-start_time').first()
-        )
-        admin = shift.admin if shift and shift.admin else None
-        barman = shift.barman if shift and shift.barman else None
+    def post(self, request):
+        """
+        Ожидается JSON:
+        {
+            "employees": [1,2],  # id сотрудников
+            "start": "2025-10-12T00:00",
+            "end": "2025-10-12T23:59"
+        }
+        """
+        employee_ids = request.data.get('employees', [])
+        start_str = request.data.get('start')
+        end_str = request.data.get('end')
 
-        def add_earning(user, role_obj, amount, service_name):
-            if not user:
-                return
-            earnings[user.id]["earnings"] += amount
-            earnings[user.id]["role"] = role_obj.name if role_obj else "Unknown"
-            earnings[user.id]["name"] = user.name
-            earnings[user.id]["services"].append({
-                "service_name": service_name,
-                "amount": round(amount, 2),
-                "date": deal.date_time.date().isoformat()
+        if not employee_ids or not start_str or not end_str:
+            return Response({'error': 'Необходимо указать сотрудников и дату начала/конца'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        start_dt = parse_datetime(start_str)
+        end_dt = parse_datetime(end_str)
+
+        if not start_dt or not end_dt:
+            return Response({'error': 'Неверный формат даты'}, status=status.HTTP_400_BAD_REQUEST)
+
+        deals = Deal.objects.filter(
+            personal__id__in=employee_ids,
+            date_time__range=(start_dt, end_dt)
+        ).select_related('personal', 'services', 'service')
+
+        result = {}
+        for d in deals:
+            emp_name = d.personal.name if d.personal else 'Неизвестный'
+            if emp_name not in result:
+                result[emp_name] = {
+                    'services_count': 0,
+                    'tovar_count': 0,
+                    'total_amount': 0,
+                    'deals': []
+                }
+
+            is_tovar = d.services.is_tovar if d.services else False
+            is_uslyga = d.services.is_uslyga if d.services else False
+
+            if is_tovar:
+                result[emp_name]['tovar_count'] += 1
+            if is_uslyga:
+                result[emp_name]['services_count'] += 1
+
+            result[emp_name]['total_amount'] += d.maney
+
+            # детализированная запись сделки
+            result[emp_name]['deals'].append({
+                'date': d.date_time.strftime('%Y-%m-%d %H:%M'),
+                'service_type': 'услуга' if is_uslyga else 'товар' if is_tovar else 'неизвестно',
+                'service': d.service.name if d.service else None,
+                'price': d.maney
             })
 
-        # --- Логика начисления ---
-        if service_type == "товар":
-            # Бармен получает maney с продажи товара
-            if barman and barman.role:
-                salary = price * barman.role.maney / 100
-                add_earning(barman, barman.role, salary, deal.service.name if deal.service else "-")
-                total_revenue += salary
+        # преобразуем в список
+        output = []
+        for emp_name, stats in result.items():
+            output.append({
+                'user': emp_name,
+                'services_count': stats['services_count'],
+                'tovar_count': stats['tovar_count'],
+                'total_amount': stats['total_amount'],
+                'deals': stats['deals']
+            })
 
-        elif service_type == "услуга":
-            # Исполнитель получает свой процент (maney для танцовщицы/прочего)
-            if personal.role:
-                if personal not in [admin, barman]:
-                    salary_personal = price * personal.role.maney / 100
-                    add_earning(personal, personal.role, salary_personal, deal.service.name if deal.service else "-")
-                    total_revenue += salary_personal
+        return Response({'performance': output})
 
-            # Админ получает всегда maney с любой услуги
-            if admin and admin.role:
-                salary_admin = price * admin.role.maney / 100
-                add_earning(admin, admin.role, salary_admin, deal.service.name if deal.service else "-")
-                total_revenue += salary_admin
+class ProductSalesView(APIView):
+    """
+    GET: возвращает все товары.
+    POST: фильтрует сделки по товарам и дате/времени и возвращает анализ.
+    """
 
-            # Бармен получает maney_a, если он сам оказал услугу
-            if personal == barman and barman and barman.role:
-                salary_barman = price * barman.role.maney_a / 100
-                add_earning(barman, barman.role, salary_barman, deal.service.name if deal.service else "-")
-                total_revenue += salary_barman
+    def get(self, request):
+        # возвращаем все товары (Service с is_tovar=True)
+        products = Service.objects.filter(role__is_tovar=True)
+        data = [
+            {
+                'id': p.id,
+                'name': p.name,
+            }
+            for p in products
+        ]
+        return Response({'products': data})
 
-            # Админ получает maney_a, если он сам оказал услугу
-            if personal == admin and admin and admin.role:
-                salary_admin_a = price * admin.role.maney_a / 100
-                add_earning(admin, admin.role, salary_admin_a, deal.service.name if deal.service else "-")
-                total_revenue += salary_admin_a
+    def post(self, request):
+        """
+        Ожидается JSON:
+        {
+            "products": [1,2,3],  # id товаров
+            "start": "2025-10-12T00:00",
+            "end": "2025-10-12T23:59"
+        }
+        """
+        product_ids = request.data.get('products', [])
+        start_str = request.data.get('start')
+        end_str = request.data.get('end')
 
-    # --- Вывод итогов ---
-    print("\n💰 Итоговый доход по ролям:")
-    for role_name in ["админ", "бармен", "танцовщица"]:
-        print(f"\nИТОГ общий доход {role_name}s:")
-        for e in earnings.values():
-            if e["role"] == role_name:
-                print(f"  {e['name']} - {round(e['earnings'], 2)}₽")
+        if not product_ids or not start_str or not end_str:
+            return Response({'error': 'Необходимо указать товары и дату начала/конца'},
+                            status=status.HTTP_400_BAD_REQUEST)
 
-    total_salary = sum([e["earnings"] for e in earnings.values()])
-    print(f"\nИТОГ общий доход всех сотрудников: {round(total_salary, 2)}₽")
-    print(f"ИТОГ чистый доход (весь доход - расходы на ЗП): {round(total_revenue - total_salary, 2)}₽")
+        start_dt = parse_datetime(start_str)
+        end_dt = parse_datetime(end_str)
 
-    print(list(earnings.values()))
+        if not start_dt or not end_dt:
+            return Response({'error': 'Неверный формат даты'}, status=status.HTTP_400_BAD_REQUEST)
+
+        deals = Deal.objects.filter(
+            service__id__in=product_ids,
+            date_time__range=(start_dt, end_dt)
+        ).select_related('service')
+
+        result = {}
+        for d in deals:
+            prod_name = d.service.name if d.service else 'Неизвестный'
+            if prod_name not in result:
+                result[prod_name] = {'count': 0, 'dates': []}
+
+            result[prod_name]['count'] += 1
+            result[prod_name]['dates'].append(d.date_time.strftime('%Y-%m-%d %H:%M'))
+
+        # преобразуем в список для фронтенда
+        output = []
+        for name, stats in result.items():
+            output.append({
+                'product': name,
+                'sold_count': stats['count'],
+                'dates': stats['dates']
+            })
+
+        return Response({'sales': output})
 
 
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from collections import defaultdict
-from django.db.models import Q
+
+"""""""""""""""""""""""""""  Расчет ЗП  """""""""""""""""""""""""""
+
 from datetime import datetime
-from .models import Deal, Shift
-
-
-class SalaryCalculationView(APIView):
+from django.db.models import Q
+class DealsInRangeView(APIView):
 
     def post(self, request):
         start_str = request.data.get('start')
         end_str = request.data.get('end')
 
         if not start_str or not end_str:
-            return Response({"error": "Параметры start и end обязательны."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'Необходимо указать start и end'}, status=status.HTTP_400_BAD_REQUEST)
 
-        try:
-            start_date = datetime.strptime(start_str, "%Y-%m-%dT%H:%M")
-            end_date = datetime.strptime(end_str, "%Y-%m-%dT%H:%M")
-        except ValueError:
-            return Response({"error": "Неверный формат даты. Используй ISO: 2025-10-10T00:00"}, status=status.HTTP_400_BAD_REQUEST)
+        start_dt = parse_datetime(start_str)
+        end_dt = parse_datetime(end_str)
+        if not start_dt or not end_dt:
+            return Response({'error': 'Неверный формат даты'}, status=status.HTTP_400_BAD_REQUEST)
 
-        deals = Deal.objects.filter(date_time__range=(start_date, end_date)).select_related("personal", "service")
-        result = self.filter_zp(deals)
+        deals = Deal.objects.filter(date_time__range=(start_dt, end_dt)).select_related(
+            'personal', 'service', 'services', 'payment', 'whom'
+        )
 
-        return Response(result, status=status.HTTP_200_OK)
+        data = []
+        for d in deals:
+            record = {
+                'id': d.id,
+                'personal': d.personal.name if d.personal else None,
+                'service': d.service.name if d.service else None,
+                "type_is_tovar": d.services.is_tovar if d.services else False,
+                "type_is_uslyga": d.services.is_uslyga if d.services else False,
+                'payment': d.payment.name if d.payment else None,
+                'whom': d.whom.name if d.whom else None,
+                'maney': d.maney,
+                'date_time': d.date_time.strftime('%Y-%m-%d %H:%M'),
+                'ais': d.ais,
+                'shift_admin': None,
+                'shift_barman': None,
+            }
 
-    def filter_zp(self, deals):
-        earnings = defaultdict(lambda: {"earnings": 0, "services": [], "role": "", "name": ""})
-        total_revenue = 0
-
-        for deal in deals:
-            if not deal.personal:
-                continue
-
-            personal = deal.personal
-            role = personal.role
-            service_type = deal.services.name.lower() if deal.services else ""
-            price = deal.maney or 0
-
-            # --- Определяем смену ---
-            shift = (
-                Shift.objects.filter(
-                    Q(start_time__lte=deal.date_time),
-                    Q(end_time__gte=deal.date_time) | Q(end_time__isnull=True)
-                ).order_by('-start_time').first()
-            )
-            admin = shift.admin if shift and shift.admin else None
-            barman = shift.barman if shift and shift.barman else None
-
-            def add_earning(user, role_obj, amount, service_name):
-                if not user or amount == 0:
-                    return
-                earnings[user.id]["earnings"] += amount
-                earnings[user.id]["role"] = role_obj.name if role_obj else "Unknown"
-                earnings[user.id]["name"] = user.name
-                earnings[user.id]["services"].append({
-                    "service_name": service_name,
-                    "amount": round(amount, 2),
-                    "date": deal.date_time.date().isoformat()
+            if d.service:
+                record.update({
+                    'percent_admin': d.service.percent_admin,
+                    'percent_barmen': d.service.percent_barmen,
+                    'percent_admin_ysluga': d.service.percent_admin_ysluga,
+                    'percent_barmen_ysluga': d.service.percent_barmen_ysluga,
+                    'percent_barmen_tanes': d.service.percent_barmen_tanes,
+                    'percent_barmen_admin': d.service.percent_barmen_admin,
+                    'percent_smol': d.service.percent_smol,
                 })
 
-            # --- Логика начисления ---
-            if service_type == "товар":
-                # Бармен получает maney с продажи товара
-                if barman and barman.role:
-                    salary = price * barman.role.maney / 100
-                    add_earning(barman, barman.role, salary, deal.services.name)
-                    total_revenue += salary
+            shift = Shift.objects.filter(
+                start_time__lte=d.date_time,
+                end_time__gte=d.date_time
+            ).first()
 
-            elif service_type == "услуга":
-                # Исполнитель получает свой процент (maney для танцовщицы/прочего)
-                if personal.role and personal not in [admin, barman]:
-                    salary_personal = price * personal.role.maney / 100
-                    add_earning(personal, personal.role, salary_personal, deal.services.name)
-                    total_revenue += salary_personal
+            if shift:
+                record['shift_admin'] = shift.admin.name if shift.admin else None
+                record['shift_barman'] = shift.barman.name if shift.barman else None
 
-                # Админ получает всегда maney с любой услуги
-                if admin and admin.role:
-                    salary_admin = price * admin.role.maney / 100
-                    add_earning(admin, admin.role, salary_admin, deal.services.name)
-                    total_revenue += salary_admin
+            data.append(record)
 
-                # Бармен получает maney_a, если он сам оказал услугу
-                if personal == barman and barman and barman.role:
-                    salary_barman = price * barman.role.maney_a / 100
-                    add_earning(barman, barman.role, salary_barman, deal.services.name)
-                    total_revenue += salary_barman
+        # вызов функции расчета доходов
+        calculation(data, start_dt, end_dt)
 
-                # Админ получает maney_a, если он сам оказал услугу
-                if personal == admin and admin and admin.role:
-                    salary_admin_a = price * admin.role.maney_a / 100
-                    add_earning(admin, admin.role, salary_admin_a, deal.services.name)
-                    total_revenue += salary_admin_a
+        return Response({
+            'posts': posts,
+            'users': users
+        })
+def deals_in_range(request):
+    if request.method == "GET":
+        return render(request, "blog/calculation_products.html")
 
-        # --- Итоговый JSON ---
-        result = list(earnings.values())
+    elif request.method == "POST":
+        start_str = request.POST.get('start')
+        end_str = request.POST.get('end')
 
-        # --- Подсчет итогов по ролям ---
-        roles_summary = defaultdict(float)
-        for e in result:
-            roles_summary[e["role"]] += e["earnings"]
+        if not start_str or not end_str:
+            return JsonResponse({'error': 'Необходимо указать start и end'}, status=400)
 
-        total_salary = sum(roles_summary.values())
+        start_dt = parse_datetime(start_str)
+        end_dt = parse_datetime(end_str)
 
-        summary = {
-            "roles_summary": {r: round(v, 2) for r, v in roles_summary.items()},
-            "total_salary": round(total_salary, 2),
-            "total_revenue": round(total_revenue, 2),
-            "clean_profit": round(total_revenue - total_salary, 2),
-            "details": result
-        }
+        if not start_dt or not end_dt:
+            return JsonResponse({'error': 'Неверный формат даты'}, status=400)
 
-        return summary
+        deals = Deal.objects.filter(date_time__range=(start_dt, end_dt)).select_related(
+            'personal', 'service', 'services', 'payment', 'whom'
+        )
+
+        data = []
+        for d in deals:
+            record = {
+                'id': d.id,
+                'personal': d.personal.name if d.personal else None,
+                'service': d.service.name if d.service else None,
+                "type_is_tovar": d.services.is_tovar if d.services else False,
+                "type_is_uslyga": d.services.is_uslyga if d.services else False,
+                'payment': d.payment.name if d.payment else None,
+                'whom': d.whom.name if d.whom else None,
+                'maney': d.maney,
+                'date_time': d.date_time.strftime('%Y-%m-%d %H:%M'),
+                'ais': d.ais,
+                'shift_admin': None,
+                'shift_barman': None,
+            }
+
+            # добавляем проценты и фиксированные выплаты, если есть service
+            if d.service:
+                record.update({
+                    'percent_admin': d.service.percent_admin,
+                    'percent_barmen': d.service.percent_barmen,
+                    'percent_admin_ysluga': d.service.percent_admin_ysluga,
+                    'percent_barmen_ysluga': d.service.percent_barmen_ysluga,
+                    'percent_barmen_tanes': d.service.percent_barmen_tanes,
+                    'percent_barmen_admin': d.service.percent_barmen_admin,
+                    'percent_smol': d.service.percent_smol,
+                })
+
+            # ищем смену, в которую попадает дата сделки
+            shift = Shift.objects.filter(
+                start_time__lte=d.date_time,
+                end_time__gte=d.date_time
+            ).first()
+
+            if shift:
+                record['shift_admin'] = shift.admin.name if shift.admin else None
+                record['shift_barman'] = shift.barman.name if shift.barman else None
+
+            data.append(record)
+        calculation(data, start_dt, end_dt)
+        print(posts)
+        print(users)
+        return JsonResponse({'deals': data})
+def calculation_income(user, maney):
+    for item in posts:
+        if item['name'] == user:
+            item['income'] += maney
+            break
+    else:
+        posts.append({'name': user, 'income': maney})
+def add_deal(master, date, service_type, service, price, pr_price, percent):
+    for user in users:
+        if user['name'] == master:
+            user['deals'].append({
+                'date': date,
+                'service_type': service_type,
+                'service': service,
+                'price': price,
+                'income': pr_price,
+                'percent': percent
+            })
+            user['total_income'] += pr_price
+            break
+    else:
+        users.append({
+            'name': master,
+            'deals': [{
+                'date': date,
+                'service_type': service_type,
+                'service': service,
+                'price': price,
+                'income': pr_price,
+                'percent': percent
+            }],
+            'total_income': pr_price
+        })
+def calculation(data, start_dt, end_dt):
+    for i in data:
+        if i['type_is_uslyga']:  # Если сделка — услуга
+            service_type = 'услуга'
+            # if i['personal'] == i['shift_admin']:  # Услуга оказана администратором
+            #     percent = i['percent_admin_ysluga']
+            #     maney = i['maney'] * percent / 100
+            #     user = i['shift_admin']
+            #     add_deal(user, i['date_time'], service_type, i['service'], i['maney'], maney, percent)
+            #     calculation_income(user, maney)
+            # elif i['personal'] == i['shift_barman']:  # Услуга оказана барменом
+            #     # Доход бармена
+            #     percent = i['percent_barmen_ysluga']
+            #     maney = i['maney'] * percent / 100
+            #     user = i['shift_barman']
+            #     add_deal(user, i['date_time'], service_type, f"{i['service']} (оказана барменом)", i['maney'], maney,
+            #              percent)
+            #     calculation_income(user, maney)
+            #     # Доход администратора
+            #     percent_ad = i['percent_admin']
+            #     maney_ad = i['maney'] * percent_ad / 100
+            #     add_deal(i['shift_admin'], i['date_time'], service_type, f"{i['service']} (от {i['personal']})",
+            #              i['maney'], maney_ad, percent_ad)
+            #     calculation_income(i['shift_admin'], maney_ad)
+            # else:  # Услуга оказана другим сотрудником
+            #     # Доход администратора
+            #     percent_ad = i['percent_admin']
+            #     maney_ad = i['maney'] * percent_ad / 100
+            #     add_deal(i['shift_admin'], i['date_time'], service_type, f"{i['service']} (от {i['personal']})",
+            #              i['maney'], maney_ad, percent_ad)
+            #     calculation_income(i['shift_admin'], maney_ad)
+            #     # Доход исполнителя
+            #     percent_p = i['percent_barmen_tanes']
+            #     maney_p = i['maney'] * percent_p / 100
+            #     add_deal(i['personal'], i['date_time'], service_type, i['service'], i['maney'], maney_p, percent_p)
+            #     calculation_income(i['personal'], maney_p)
+            if i['personal'] == i['shift_admin']:  # Услуга оказана администратором
+                percent = i['percent_smol'] if i['percent_smol'] > 0 else i[
+                    'percent_admin_ysluga']  # Use percent_smol if non-zero
+                maney = i['maney'] * percent / 100
+                user = i['shift_admin']
+                add_deal(user, i['date_time'], service_type, i['service'], i['maney'], maney, percent)
+                calculation_income(user, maney)
+            elif i['personal'] == i['shift_barman']:  # Услуга оказана барменом
+                # Доход бармена
+                percent = i['percent_smol'] if i['percent_smol'] > 0 else i[
+                    'percent_barmen_ysluga']  # Use percent_smol if non-zero
+                maney = i['maney'] * percent / 100
+                user = i['shift_barman']
+                add_deal(user, i['date_time'], service_type, f"{i['service']} (оказана барменом)", i['maney'], maney,
+                         percent)
+                calculation_income(user, maney)
+                # Доход администратора
+                percent_ad = i['percent_admin']
+                maney_ad = i['maney'] * percent_ad / 100
+                add_deal(i['shift_admin'], i['date_time'], service_type, f"{i['service']} (от {i['personal']})",
+                         i['maney'], maney_ad, percent_ad)
+                calculation_income(i['shift_admin'], maney_ad)
+            else:  # Услуга оказана другим сотрудником
+                # Доход администратора
+                percent_ad = i['percent_admin']
+                maney_ad = i['maney'] * percent_ad / 100
+                add_deal(i['shift_admin'], i['date_time'], service_type, f"{i['service']} (от {i['personal']})",
+                         i['maney'], maney_ad, percent_ad)
+                calculation_income(i['shift_admin'], maney_ad)
+                # Доход исполнителя
+                percent_p = i['percent_smol'] if i['percent_smol'] > 0 else i[
+                    'percent_barmen_tanes']  # Use percent_smol if non-zero
+                maney_p = i['maney'] * percent_p / 100
+                add_deal(i['personal'], i['date_time'], service_type, i['service'], i['maney'], maney_p, percent_p)
+                calculation_income(i['personal'], maney_p)
+        elif i['type_is_tovar']:  # Если сделка — товар
+            service_type = 'товар'
+            # Доход бармена
+            percent_bar = i['percent_barmen']
+            maney_bar = i['maney'] * percent_bar / 100
+            add_deal(i['shift_barman'], i['date_time'], service_type, f"{i['service']} (от {i['personal']})",
+                     i['maney'], maney_bar, percent_bar)
+            calculation_income(i['shift_barman'], maney_bar)
+            # Фиксированный доход для исполнителя, если есть
+            if i['percent_barmen_admin'] > 0:
+                maney_fix = i['percent_barmen_admin']
+                add_deal(i['personal'], i['date_time'], service_type, f"{i['service']} (фиксированный доход)",
+                         i['maney'], maney_fix, 'фиксировано')
+                calculation_income(i['personal'], maney_fix)
+# Добавлено: Обработка пустых смен
+    shifts = Shift.objects.filter(
+        Q(start_time__lte=end_dt) &
+        (Q(end_time__gte=start_dt) | Q(end_time__isnull=True))
+    )
+    for shift in shifts:
+        end_shift = shift.end_time if shift.end_time else datetime.now()
+        has_deals = Deal.objects.filter(date_time__range=(shift.start_time, end_shift)).exists()
+        if not has_deals:
+            # Пустая смена
+            if shift.admin:
+                bonus = shift.admin.role.maney_null
+                calculation_income(shift.admin.name, bonus)
+                add_deal(shift.admin.name, shift.start_time.strftime('%Y-%m-%d %H:%M'), 'пустая смена', 'Пустая смена', 0, bonus, 'фиксировано')
+            if shift.barman:
+                bonus = shift.barman.role.maney_null
+                calculation_income(shift.barman.name, bonus)
+                add_deal(shift.barman.name, shift.start_time.strftime('%Y-%m-%d %H:%M'), 'пустая смена', 'Пустая смена', 0, bonus, 'фиксировано')
