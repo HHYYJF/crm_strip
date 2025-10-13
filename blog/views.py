@@ -69,7 +69,7 @@ class IndexAPIView(APIView):
         return Response({
             "id": shift.id,
             "admin": admin.name,
-            "barman": barman.name,
+            "bartenders": barman.name,
             "start_time": shift.start_time,
         }, status=status.HTTP_201_CREATED)
 
