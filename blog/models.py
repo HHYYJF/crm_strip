@@ -44,7 +44,7 @@ class Personal(models.Model):
 class Service(models.Model):
     name = models.CharField(max_length=64, verbose_name="название")
     role = models.ForeignKey(Services, on_delete=models.CASCADE, blank=True, null=True, verbose_name="Вид")
-    percent_admin = models.PositiveSmallIntegerField(default=0, verbose_name="% админу за чью то услугу 5%")
+    percent_admin = models.PositiveSmallIntegerField(default=0, verbose_name="% админу за товар 5%")
     percent_barmen = models.PositiveSmallIntegerField(default=0, verbose_name="% бармену чей то товар 5%")
     percent_admin_ysluga = models.PositiveSmallIntegerField(default=0, verbose_name="% админу за услугу 50% ")
     percent_barmen_ysluga = models.PositiveSmallIntegerField(default=0, verbose_name="% бармену за услугу 50% ")

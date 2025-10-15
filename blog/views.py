@@ -1,5 +1,6 @@
 import time
 
+from django.views.decorators.csrf import csrf_exempt
 from rest_framework.decorators import api_view
 from django.db import models
 from django.contrib.auth import authenticate
@@ -15,9 +16,6 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.utils.dateparse import parse_datetime
-
-posts = []
-users = []
 @api_view(['POST'])
 def login_view(request):
     serializer = LoginSerializer(data=request.data)
@@ -147,32 +145,21 @@ class LogoutView(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from django.utils import timezone
+from .models import Deal, Payment, Whom, Service, Services, Personal
+
+
 class DealAPIView(APIView):
     """Создание и получение сделок"""
 
     def get(self, request):
-        # 1️⃣ Активные сделки
+        # --- Активные сделки ---
         active_deals = Deal.objects.filter(ais=True).select_related(
             "personal", "services", "service", "payment", "whom"
         )
-
-        deals_data = [
-            {
-                "id": d.id,
-                "staff": d.personal.name if d.personal else None,
-                "staff_id": d.personal.id if d.personal else None,
-                "service_type": "товар" if d.services and d.services.is_tovar else "услуга" if d.services else None,
-                "service": d.service.name if d.service else None,
-                "service_id": d.service.id if d.service else None,
-                "payment": d.payment.name if d.payment else None,
-                "payment_id": d.payment.id if d.payment else None,
-                "whom": d.whom.name if d.whom else None,
-                "whom_id": d.whom.id if d.whom else None,
-                "maney": d.maney,
-                "date_time": d.date_time.strftime("%Y-%m-%d %H:%M"),
-            }
-            for d in active_deals
-        ]
 
         deals_data = [
             {
@@ -186,13 +173,25 @@ class DealAPIView(APIView):
                 "payment": d.payment.name if d.payment else None,
                 "whom": d.whom.name if d.whom else None,
                 "money": d.maney,
-                "created_at": d.date_time.isoformat()  # ISO 8601
+                "created_at": d.date_time.isoformat()
             }
-            for d in active_deals  # твой queryset Deal.objects.filter(...)
+            for d in active_deals
         ]
 
+        # --- Справочники для фронтенда ---
+        payments = list(Payment.objects.values("id", "name"))
+        whoms = list(Whom.objects.values("id", "name"))
+        services = list(Service.objects.values("id", "name"))
+        service_types = list(Services.objects.values("id", "is_tovar", "is_uslyga"))
+        personals = list(Personal.objects.values("id", "name"))
+
         return Response({
-            "deals": deals_data
+            "deals": deals_data,
+            "payments": payments,
+            "whoms": whoms,
+            "services": services,
+            "service_types": service_types,
+            "personals": personals
         })
 
     def post(self, request):
@@ -229,13 +228,13 @@ class DealAPIView(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+
 @api_view(['GET'])
 def shift_staff(request):
     roles = Role.objects.all()
     staff_data = {}
 
     for role in roles:
-        # Получаем сотрудников этой роли
         personals = Personal.objects.filter(role=role)
 
         staff_data[role.name.lower()] = {
@@ -271,14 +270,6 @@ class EmployeePerformanceView(APIView):
         return Response({'employees': data})
 
     def post(self, request):
-        """
-        Ожидается JSON:
-        {
-            "employees": [1,2],  # id сотрудников
-            "start": "2025-10-12T00:00",
-            "end": "2025-10-12T23:59"
-        }
-        """
         employee_ids = request.data.get('employees', [])
         start_str = request.data.get('start')
         end_str = request.data.get('end')
@@ -408,8 +399,12 @@ class ProductSalesView(APIView):
 
 """""""""""""""""""""""""""  история + расчет  """""""""""""""""""""""""""
 
+
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+from rest_framework import status
+from django.utils.dateparse import parse_datetime
+from django.db.models import Sum
 from .models import Deal
 
 @api_view(['POST'])
@@ -420,130 +415,60 @@ def historianalitic(request):
     if not start_str or not end_str:
         return Response({'error': 'Необходимо указать start и end'}, status=status.HTTP_400_BAD_REQUEST)
 
-    start_dt = parse_datetime(start_str)
-    end_dt = parse_datetime(end_str)
-    if not start_dt or not end_dt:
-        return Response({'error': 'Неверный формат даты'}, status=status.HTTP_400_BAD_REQUEST)
+    # --- безопасная проверка дат ---
+    try:
+        start_dt = parse_datetime(start_str)
+        end_dt = parse_datetime(end_str)
+    except ValueError:
+        return Response({
+            'error': 'Неверный формат даты. Пример правильного формата: "2025-10-12T00:00"'
+        }, status=status.HTTP_400_BAD_REQUEST)
 
-    # Получаем сделки за указанный период
+    if not start_dt or not end_dt:
+        return Response({
+            'error': 'Неверный формат даты. Пример правильного формата: "2025-10-12T00:00"'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    # --- если end_dt больше текущей даты, ставим текущую ---
+    now = datetime.now()
+    if end_dt > now:
+        end_dt = now
+
+    # --- получаем сделки за период ---
     deals = Deal.objects.filter(date_time__range=[start_dt, end_dt])
     data = get_deals_info(deals)
-    for i in data:
-        if i['type_is_uslyga']:  # Если сделка — услуга
-            service_type = 'услуга'
-            # if i['personal'] == i['shift_admin']:  # Услуга оказана администратором
-            #     percent = i['percent_admin_ysluga']
-            #     maney = i['maney'] * percent / 100
-            #     user = i['shift_admin']
-            #     add_deal(user, i['date_time'], service_type, i['service'], i['maney'], maney, percent)
-            #     calculation_income(user, maney)
-            # elif i['personal'] == i['shift_barman']:  # Услуга оказана барменом
-            #     # Доход бармена
-            #     percent = i['percent_barmen_ysluga']
-            #     maney = i['maney'] * percent / 100
-            #     user = i['shift_barman']
-            #     add_deal(user, i['date_time'], service_type, f"{i['service']} (оказана барменом)", i['maney'], maney,
-            #              percent)
-            #     calculation_income(user, maney)
-            #     # Доход администратора
-            #     percent_ad = i['percent_admin']
-            #     maney_ad = i['maney'] * percent_ad / 100
-            #     add_deal(i['shift_admin'], i['date_time'], service_type, f"{i['service']} (от {i['personal']})",
-            #              i['maney'], maney_ad, percent_ad)
-            #     calculation_income(i['shift_admin'], maney_ad)
-            # else:  # Услуга оказана другим сотрудником
-            #     # Доход администратора
-            #     percent_ad = i['percent_admin']
-            #     maney_ad = i['maney'] * percent_ad / 100
-            #     add_deal(i['shift_admin'], i['date_time'], service_type, f"{i['service']} (от {i['personal']})",
-            #              i['maney'], maney_ad, percent_ad)
-            #     calculation_income(i['shift_admin'], maney_ad)
-            #     # Доход исполнителя
-            #     percent_p = i['percent_barmen_tanes']
-            #     maney_p = i['maney'] * percent_p / 100
-            #     add_deal(i['personal'], i['date_time'], service_type, i['service'], i['maney'], maney_p, percent_p)
-            #     calculation_income(i['personal'], maney_p)
-            if i['personal'] == i['shift_admin']:  # Услуга оказана администратором
-                percent = i['percent_smol'] if i['percent_smol'] > 0 else i[
-                    'percent_admin_ysluga']  # Use percent_smol if non-zero
-                maney = i['maney'] * percent / 100
-                user = i['shift_admin']
-                add_deal(user, i['date_time'], service_type, i['service'], i['maney'], maney, percent)
-                calculation_income(user, maney)
-            elif i['personal'] == i['shift_barman']:  # Услуга оказана барменом
-                # Доход бармена
-                percent = i['percent_smol'] if i['percent_smol'] > 0 else i[
-                    'percent_barmen_ysluga']  # Use percent_smol if non-zero
-                maney = i['maney'] * percent / 100
-                user = i['shift_barman']
-                add_deal(user, i['date_time'], service_type, f"{i['service']} (оказана барменом)", i['maney'], maney,
-                         percent)
-                calculation_income(user, maney)
-                # Доход администратора
-                percent_ad = i['percent_admin']
-                maney_ad = i['maney'] * percent_ad / 100
-                add_deal(i['shift_admin'], i['date_time'], service_type, f"{i['service']} (от {i['personal']})",
-                         i['maney'], maney_ad, percent_ad)
-                calculation_income(i['shift_admin'], maney_ad)
-            else:  # Услуга оказана другим сотрудником
-                # Доход администратора
-                percent_ad = i['percent_admin']
-                maney_ad = i['maney'] * percent_ad / 100
-                add_deal(i['shift_admin'], i['date_time'], service_type, f"{i['service']} (от {i['personal']})",
-                         i['maney'], maney_ad, percent_ad)
-                calculation_income(i['shift_admin'], maney_ad)
-                # Доход исполнителя
-                percent_p = i['percent_smol'] if i['percent_smol'] > 0 else i[
-                    'percent_barmen_tanes']  # Use percent_smol if non-zero
-                maney_p = i['maney'] * percent_p / 100
-                add_deal(i['personal'], i['date_time'], service_type, i['service'], i['maney'], maney_p, percent_p)
-                calculation_income(i['personal'], maney_p)
-        elif i['type_is_tovar']:  # Если сделка — товар
-            service_type = 'товар'
-            # Доход бармена
-            percent_bar = i['percent_barmen']
-            maney_bar = i['maney'] * percent_bar / 100
-            add_deal(i['shift_barman'], i['date_time'], service_type, f"{i['service']} (от {i['personal']})",
-                     i['maney'], maney_bar, percent_bar)
-            calculation_income(i['shift_barman'], maney_bar)
-            # Фиксированный доход для исполнителя, если есть
-            if i['percent_barmen_admin'] > 0:
-                maney_fix = i['percent_barmen_admin']
-                add_deal(i['personal'], i['date_time'], service_type, f"{i['service']} (фиксированный доход)",
-                         i['maney'], maney_fix, 'фиксировано')
-                calculation_income(i['personal'], maney_fix)
-    # calculation(deals, time.time(), time.time())
-    # === 1. Сколько прошло по видам оплаты ===
+
+    # --- расчет доходов ---
+    posts, users = calculation(data, start_dt, end_dt)
+
+    # --- аналитика по оплатам ---
     payments_data = (
         deals.values('payment__name')
         .order_by('payment__name')
-        .annotate(total=models.Sum('maney'))
+        .annotate(total=Sum('maney'))
     )
 
-    # === 2. Сколько прошло всего средств ===
-    total_money = deals.aggregate(total=models.Sum('maney'))['total'] or 0
-
-    # === 3. Сколько оказано услуг ===
+    total_money = deals.aggregate(total=Sum('maney'))['total'] or 0
     services_count = deals.filter(services__is_uslyga=True).count()
-
-    # === 4. Сколько продано товара ===
     products_count = deals.filter(services__is_tovar=True).count()
+
+    posts.sort(key=lambda x: x['income'], reverse=True)
+    users.sort(key=lambda x: x['total_income'], reverse=True)
 
     result = {
         "payments": [
-            {
-                "payment_type": p['payment__name'],
-                "amount": p['total']
-            }
+            {"payment_type": p['payment__name'], "amount": p['total']}
             for p in payments_data
         ],
         "total_money": total_money,
         "services_count": services_count,
         "products_count": products_count,
         "posts": posts,
+        "users": users
     }
 
     return Response(result)
+
 
 
 
@@ -616,12 +541,14 @@ class DealsInRangeView(APIView):
         )
         data = get_deals_info(deals)
         # вызов функции расчета доходов
-        calculation(data, start_dt, end_dt)
+        posts,users = calculation(data, start_dt, end_dt)
 
         return Response({
             'posts': posts,
             'users': users
         })
+
+@csrf_exempt
 def deals_in_range(request):
     if request.method == "GET":
         return render(request, "blog/calculation_products.html")
@@ -682,143 +609,127 @@ def deals_in_range(request):
                 record['shift_barman'] = shift.barman.name if shift.barman else None
 
             data.append(record)
-        calculation(data, start_dt, end_dt)
+        posts,users = calculation(data, start_dt, end_dt)
         print(posts)
         print(users)
-        return JsonResponse({'deals': data})
-def calculation_income(user, maney):
-    for item in posts:
-        if item['name'] == user:
-            item['income'] += maney
-            break
-    else:
-        posts.append({'name': user, 'income': maney})
-def add_deal(master, date, service_type, service, price, pr_price, percent):
-    for user in users:
-        if user['name'] == master:
-            user['deals'].append({
-                'date': date,
-                'service_type': service_type,
-                'service': service,
-                'price': price,
-                'income': pr_price,
-                'percent': percent
-            })
-            user['total_income'] += pr_price
-            break
-    else:
-        users.append({
-            'name': master,
-            'deals': [{
-                'date': date,
-                'service_type': service_type,
-                'service': service,
-                'price': price,
-                'income': pr_price,
-                'percent': percent
-            }],
-            'total_income': pr_price
-        })
+        return JsonResponse({"posts":posts,"users":users})
+
+
+
 def calculation(data, start_dt, end_dt):
+    posts = []
+    users = []
+
+    def calculation_income(user, maney):
+        for item in posts:
+            if item['name'] == user:
+                item['income'] += maney
+                break
+        else:
+            posts.append({'name': user, 'income': maney})
+    def add_deal(master, date, service_type, service, price, pr_price, percent):
+        for user in users:
+            if user['name'] == master:
+                user['deals'].append({
+                    'date': date,
+                    'service_type': service_type,
+                    'service': service,
+                    'price': price,
+                    'income': pr_price,
+                    'percent': percent
+                })
+                user['total_income'] += pr_price
+                break
+        else:
+            users.append({
+                'name': master,
+                'deals': [{
+                    'date': date,
+                    'service_type': service_type,
+                    'service': service,
+                    'price': price,
+                    'income': pr_price,
+                    'percent': percent
+                }],
+                'total_income': pr_price
+            })
+
     for i in data:
-        if i['type_is_uslyga']:  # Если сделка — услуга
+        # --- УСЛУГА ---
+        if i['type_is_uslyga']:
             service_type = 'услуга'
-            # if i['personal'] == i['shift_admin']:  # Услуга оказана администратором
-            #     percent = i['percent_admin_ysluga']
-            #     maney = i['maney'] * percent / 100
-            #     user = i['shift_admin']
-            #     add_deal(user, i['date_time'], service_type, i['service'], i['maney'], maney, percent)
-            #     calculation_income(user, maney)
-            # elif i['personal'] == i['shift_barman']:  # Услуга оказана барменом
-            #     # Доход бармена
-            #     percent = i['percent_barmen_ysluga']
-            #     maney = i['maney'] * percent / 100
-            #     user = i['shift_barman']
-            #     add_deal(user, i['date_time'], service_type, f"{i['service']} (оказана барменом)", i['maney'], maney,
-            #              percent)
-            #     calculation_income(user, maney)
-            #     # Доход администратора
-            #     percent_ad = i['percent_admin']
-            #     maney_ad = i['maney'] * percent_ad / 100
-            #     add_deal(i['shift_admin'], i['date_time'], service_type, f"{i['service']} (от {i['personal']})",
-            #              i['maney'], maney_ad, percent_ad)
-            #     calculation_income(i['shift_admin'], maney_ad)
-            # else:  # Услуга оказана другим сотрудником
-            #     # Доход администратора
-            #     percent_ad = i['percent_admin']
-            #     maney_ad = i['maney'] * percent_ad / 100
-            #     add_deal(i['shift_admin'], i['date_time'], service_type, f"{i['service']} (от {i['personal']})",
-            #              i['maney'], maney_ad, percent_ad)
-            #     calculation_income(i['shift_admin'], maney_ad)
-            #     # Доход исполнителя
-            #     percent_p = i['percent_barmen_tanes']
-            #     maney_p = i['maney'] * percent_p / 100
-            #     add_deal(i['personal'], i['date_time'], service_type, i['service'], i['maney'], maney_p, percent_p)
-            #     calculation_income(i['personal'], maney_p)
-            if i['personal'] == i['shift_admin']:  # Услуга оказана администратором
-                percent = i['percent_smol'] if i['percent_smol'] > 0 else i[
-                    'percent_admin_ysluga']  # Use percent_smol if non-zero
+
+            # ✅ Если есть спецпроцент (percent_smol) — он приоритетный
+            if i['percent_smol'] > 0:
+                percent = i['percent_smol']
                 maney = i['maney'] * percent / 100
-                user = i['shift_admin']
-                add_deal(user, i['date_time'], service_type, i['service'], i['maney'], maney, percent)
-                calculation_income(user, maney)
-            elif i['personal'] == i['shift_barman']:  # Услуга оказана барменом
-                # Доход бармена
-                percent = i['percent_smol'] if i['percent_smol'] > 0 else i[
-                    'percent_barmen_ysluga']  # Use percent_smol if non-zero
+                add_deal(i['personal'], i['date_time'], service_type, f"{i['service']} (спец %)", i['maney'], maney, percent)
+                calculation_income(i['personal'], maney)
+                continue  # пропускаем остальную логику
+
+            # ✅ Если исполнитель администратор
+            if i['personal'] == i['shift_admin']:
+                percent = i['percent_admin_ysluga']
                 maney = i['maney'] * percent / 100
-                user = i['shift_barman']
-                add_deal(user, i['date_time'], service_type, f"{i['service']} (оказана барменом)", i['maney'], maney,
-                         percent)
-                calculation_income(user, maney)
-                # Доход администратора
-                percent_ad = i['percent_admin']
-                maney_ad = i['maney'] * percent_ad / 100
-                add_deal(i['shift_admin'], i['date_time'], service_type, f"{i['service']} (от {i['personal']})",
-                         i['maney'], maney_ad, percent_ad)
-                calculation_income(i['shift_admin'], maney_ad)
-            else:  # Услуга оказана другим сотрудником
-                # Доход администратора
-                percent_ad = i['percent_admin']
-                maney_ad = i['maney'] * percent_ad / 100
-                add_deal(i['shift_admin'], i['date_time'], service_type, f"{i['service']} (от {i['personal']})",
-                         i['maney'], maney_ad, percent_ad)
-                calculation_income(i['shift_admin'], maney_ad)
-                # Доход исполнителя
-                percent_p = i['percent_smol'] if i['percent_smol'] > 0 else i[
-                    'percent_barmen_tanes']  # Use percent_smol if non-zero
-                maney_p = i['maney'] * percent_p / 100
-                add_deal(i['personal'], i['date_time'], service_type, i['service'], i['maney'], maney_p, percent_p)
-                calculation_income(i['personal'], maney_p)
-        elif i['type_is_tovar']:  # Если сделка — товар
+                add_deal(i['shift_admin'], i['date_time'], service_type, f"{i['service']} (оказана админом)", i['maney'], maney, percent)
+                calculation_income(i['shift_admin'], maney)
+
+            # ✅ Если исполнитель бармен
+            elif i['personal'] == i['shift_barman']:
+                percent = i['percent_barmen_ysluga']
+                maney = i['maney'] * percent / 100
+                add_deal(i['shift_barman'], i['date_time'], service_type, f"{i['service']} (оказана барменом)", i['maney'], maney, percent)
+                calculation_income(i['shift_barman'], maney)
+
+            # ✅ Если кто-то другой (например, танцовщица)
+            else:
+                percent = i['percent_barmen_tanes']
+                maney = i['maney'] * percent / 100
+                add_deal(i['personal'], i['date_time'], service_type, i['service'], i['maney'], maney, percent)
+                calculation_income(i['personal'], maney)
+
+        # --- ТОВАР ---
+        elif i['type_is_tovar']:
             service_type = 'товар'
-            # Доход бармена
+
+            # ✅ Доход администратора
+            percent_ad = i['percent_admin']
+            maney_ad = i['maney'] * percent_ad / 100
+            add_deal(i['shift_admin'], i['date_time'], service_type, f"{i['service']} (продажа от {i['personal']})", i['maney'], maney_ad, percent_ad)
+            calculation_income(i['shift_admin'], maney_ad)
+
+            # ✅ Доход бармена
             percent_bar = i['percent_barmen']
             maney_bar = i['maney'] * percent_bar / 100
-            add_deal(i['shift_barman'], i['date_time'], service_type, f"{i['service']} (от {i['personal']})",
-                     i['maney'], maney_bar, percent_bar)
+            add_deal(i['shift_barman'], i['date_time'], service_type, f"{i['service']} (продажа от {i['personal']})", i['maney'], maney_bar, percent_bar)
             calculation_income(i['shift_barman'], maney_bar)
-            # Фиксированный доход для исполнителя, если есть
+
+            # ✅ Фиксированный доход исполнителю, если задан percent_barmen_admin
             if i['percent_barmen_admin'] > 0:
                 maney_fix = i['percent_barmen_admin']
-                add_deal(i['personal'], i['date_time'], service_type, f"{i['service']} (фиксированный доход)",
-                         i['maney'], maney_fix, 'фиксировано')
+                add_deal(i['personal'], i['date_time'], service_type, f"{i['service']} (фикс доход)", i['maney'], maney_fix, 'фиксировано')
                 calculation_income(i['personal'], maney_fix)
-    # Добавлено: Обработка пустых смен
+
+    # --- ПУСТЫЕ СМЕНЫ ---
     shifts = Shift.objects.filter(
         Q(start_time__lte=end_dt) &
         (Q(end_time__gte=start_dt) | Q(end_time__isnull=True))
     )
+
     for shift in shifts:
         end_shift = shift.end_time if shift.end_time else datetime.now()
         has_deals = Deal.objects.filter(date_time__range=(shift.start_time, end_shift)).exists()
+
         if not has_deals:
-            # Пустая смена
+            # Админ получает фикс за пустую смену
             if shift.admin:
                 bonus = shift.admin.role.maney_null
                 calculation_income(shift.admin.name, bonus)
                 add_deal(shift.admin.name, shift.start_time.strftime('%Y-%m-%d %H:%M'), 'пустая смена', 'Пустая смена', 0, bonus, 'фиксировано')
+
+            # Бармен получает фикс за пустую смену
             if shift.barman:
                 bonus = shift.barman.role.maney_null
                 calculation_income(shift.barman.name, bonus)
                 add_deal(shift.barman.name, shift.start_time.strftime('%Y-%m-%d %H:%M'), 'пустая смена', 'Пустая смена', 0, bonus, 'фиксировано')
+    return posts, users
