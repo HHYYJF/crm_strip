@@ -156,29 +156,11 @@ class DealAPIView(APIView):
     """Создание и получение сделок"""
 
     def get(self, request):
-        # --- Активные сделки ---
         active_deals = Deal.objects.filter(ais=True).select_related(
             "personal", "services", "service", "payment", "whom"
         )
 
-        deals_data = [
-            {
-                "id": d.id,
-                "staff": {
-                    "id": d.personal.id if d.personal else None,
-                    "username": d.personal.name if d.personal else None
-                },
-                "service_type": "Продукт" if d.services and d.services.is_tovar else "Услуга" if d.services else None,
-                "service": d.service.name if d.service else None,
-                "payment": d.payment.name if d.payment else None,
-                "whom": d.whom.name if d.whom else None,
-                "money": d.maney,
-                "created_at": d.date_time.isoformat()
-            }
-            for d in active_deals
-        ]
 
-        # --- Справочники для фронтенда ---
         payments = list(Payment.objects.values("id", "name"))
         whoms = list(Whom.objects.values("id", "name"))
         services = list(Service.objects.values("id", "name"))
@@ -186,7 +168,6 @@ class DealAPIView(APIView):
         personals = list(Personal.objects.values("id", "name"))
 
         return Response({
-            "deals": deals_data,
             "payments": payments,
             "whoms": whoms,
             "services": services,
@@ -231,12 +212,11 @@ class DealAPIView(APIView):
 
 @api_view(['GET'])
 def shift_staff(request):
-    roles = Role.objects.all()
+    roles = Role.objects.filter(bool_name=True)  # фильтруем только нужные роли
     staff_data = {}
 
     for role in roles:
         personals = Personal.objects.filter(role=role)
-
         staff_data[role.name.lower()] = {
             "label": role.name,
             "users": [

@@ -20,6 +20,7 @@ class Role(models.Model):
     name = models.CharField(max_length=64, verbose_name="Роль сотрудника")
     maney_d = models.PositiveSmallIntegerField(default=0, verbose_name="Доход за продление смены")
     maney_null = models.PositiveSmallIntegerField(default=0, verbose_name="Цена за пустую смену")
+    bool_name = models.BooleanField(default=False, verbose_name="Отоброжение в выборе смен")
 
     def __str__(self):
         return self.name
