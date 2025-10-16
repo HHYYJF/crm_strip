@@ -1,7 +1,7 @@
 from django.urls import path
 
 from blog.views import login_view, IndexAPIView, LogoutView, DealAPIView, shift_staff, deals_in_range, DealsInRangeView, \
-    EmployeePerformanceView, ProductSalesView, historianalitic
+    EmployeePerformanceView, ProductSalesView, historianalitic,HistoryAPIView
 
 urlpatterns = [
     path('auth/login/', login_view, name='api_login'), # вход
@@ -9,6 +9,7 @@ urlpatterns = [
     path('shift/', IndexAPIView.as_view(), name='shift'),  # выбор кто на смене
     path('shift/staff/', shift_staff, name='histori'),  # история смен
     path('shift/deal/', DealAPIView.as_view(), name='recording'),  # создание записи
+    path('shift/history/', HistoryAPIView, name='history'),  # история смен за смену
 
     path('histori_analitic/',historianalitic, name='historianalitic'),  # история + отчет
     path('range/',DealsInRangeView.as_view(), name='range'),  # расчет ЗП + подробная информация

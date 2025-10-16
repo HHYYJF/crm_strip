@@ -24,3 +24,6 @@ class PersonalSerializer(serializers.ModelSerializer):
 class ShiftCreateSerializer(serializers.Serializer):
     administrator_id = serializers.IntegerField(required=True)
     bartender_id = serializers.IntegerField(required=True)
+
+
+

@@ -40,7 +40,49 @@ def login_view(request):
             {"error": "Неверное имя пользователя или пароль"},
             status=status.HTTP_401_UNAUTHORIZED
         )
+@api_view(['GET'])
+def HistoryAPIView(request):
+    deals = Deal.objects.filter(ais=True).values(
+        'id',
+        'personal__name',
+        'service__name',
+        'payment__name',
+        'whom__name',
+        'maney',
+        'date_time',
+        'ais'
+    )
 
+@api_view(['GET'])
+def HistoryAPIView(request):
+
+    active_deals = Deal.objects.filter(ais=True).select_related(
+        "personal", "services", "service", "payment", "whom"
+    )
+
+    data = [
+        {
+            "id": deal.id,
+            "personal": {
+                "id": deal.personal.id if deal.personal else None,
+                "name": deal.personal.name if deal.personal else None,
+                "role": deal.personal.role.name if deal.personal and deal.personal.role else None,
+            },
+            "services": {
+                "id": deal.services.id if deal.services else None,
+                "is_tovar": deal.services.is_tovar if deal.services else None,
+            },
+            "service": deal.service.name if deal.service else None,
+            "payment": deal.payment.name if deal.payment else None,
+            "whom": deal.whom.name if deal.whom else None,
+            "maney": deal.maney,
+            "date_time": deal.date_time.strftime("%Y-%m-%d %H:%M:%S"),
+            "ais": deal.ais,
+        }
+        for deal in active_deals
+    ]
+
+    return Response({"history": data})
 class IndexAPIView(APIView):
     # authentication_classes = [TokenAuthentication]
     # permission_classes = [IsAuthenticated]
@@ -160,18 +202,26 @@ class DealAPIView(APIView):
             "personal", "services", "service", "payment", "whom"
         )
 
+        service_types = Services.objects.all()
 
+        data = []
+        for s in service_types:
+            name = "Товар" if s.is_tovar else "Услуга"
+            data.append({
+                "id": s.id,
+                "name": name
+            })
         payments = list(Payment.objects.values("id", "name"))
         whoms = list(Whom.objects.values("id", "name"))
         services = list(Service.objects.values("id", "name"))
-        service_types = list(Services.objects.values("id", "is_tovar", "is_uslyga"))
+
         personals = list(Personal.objects.values("id", "name"))
 
         return Response({
             "payments": payments,
             "whoms": whoms,
             "services": services,
-            "service_types": service_types,
+            "service_types": data,
             "personals": personals
         })
 
