@@ -113,9 +113,9 @@ def HistoryAPIView(request):
 class IndexAPIView(APIView):
 
     def post(self, request):
-        user = get_user_from_cookie(request)
-        if not user:
-            return Response({"error": "Не авторизован"}, status=status.HTTP_401_UNAUTHORIZED)
+        # user = get_user_from_cookie(request)
+        # if not user:
+        #     return Response({"error": "Не авторизован"}, status=status.HTTP_401_UNAUTHORIZED)
 
         serializer = ShiftCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -156,9 +156,9 @@ class IndexAPIView(APIView):
         return Response({"shifts": [shift_data]}, status=status.HTTP_201_CREATED)
 
     def get(self, request):
-        user = get_user_from_cookie(request)
-        if not user:
-            return Response({"error": "Не авторизован"}, status=status.HTTP_401_UNAUTHORIZED)
+        # user = get_user_from_cookie(request)
+        # if not user:
+        #     return Response({"error": "Не авторизован"}, status=status.HTTP_401_UNAUTHORIZED)
 
         shifts = Shift.objects.all().select_related('admin', 'barman')
 
@@ -187,9 +187,9 @@ class IndexAPIView(APIView):
 
 class LogoutView(APIView):
     def get(self, request):
-        user = get_user_from_cookie(request)
-        if not user:
-            return Response({"error": "Не авторизован"}, status=status.HTTP_401_UNAUTHORIZED)
+        # user = get_user_from_cookie(request)
+        # if not user:
+        #     return Response({"error": "Не авторизован"}, status=status.HTTP_401_UNAUTHORIZED)
 
         try:
             # Все сделки делаем неактивными
@@ -202,8 +202,8 @@ class LogoutView(APIView):
                 shift.end_time = timezone.now()
                 shift.save()
 
-            # Удаляем токен текущего пользователя
-            Token.objects.filter(user=user).delete()
+            # # Удаляем токен текущего пользователя
+            # Token.objects.filter(user=user).delete()
 
             return Response({
                 "message": "Выход выполнен успешно"
@@ -225,9 +225,9 @@ class DealAPIView(APIView):
     """Создание и получение сделок"""
 
     def get(self, request):
-        user = get_user_from_cookie(request)
-        if not user:
-            return Response({"error": "Не авторизован"}, status=status.HTTP_401_UNAUTHORIZED)
+        # user = get_user_from_cookie(request)
+        # if not user:
+        #     return Response({"error": "Не авторизован"}, status=status.HTTP_401_UNAUTHORIZED)
 
         services_qs = Service.objects.select_related('role').all()
         services = []
@@ -250,9 +250,9 @@ class DealAPIView(APIView):
         })
 
     def post(self, request):
-        user = get_user_from_cookie(request)
-        if not user:
-            return Response({"error": "Не авторизован"}, status=status.HTTP_401_UNAUTHORIZED)
+#         user = get_user_from_cookie(request)
+#         if not user:
+#             return Response({"error": "Не авторизован"}, status=status.HTTP_401_UNAUTHORIZED)
         data = request.data
         try:
             deal = Deal.objects.create(
@@ -317,9 +317,9 @@ class EmployeePerformanceView(APIView):
     """
 
     def get(self, request):
-        user = get_user_from_cookie(request)
-        if not user:
-            return Response({"error": "Не авторизован"}, status=status.HTTP_401_UNAUTHORIZED)
+#         user = get_user_from_cookie(request)
+#         if not user:
+#             return Response({"error": "Не авторизован"}, status=status.HTTP_401_UNAUTHORIZED)
         employees = Personal.objects.all()
         data = [
             {
@@ -332,9 +332,9 @@ class EmployeePerformanceView(APIView):
         return Response({'employees': data})
 
     def post(self, request):
-        user = get_user_from_cookie(request)
-        if not user:
-            return Response({"error": "Не авторизован"}, status=status.HTTP_401_UNAUTHORIZED)
+#         user = get_user_from_cookie(request)
+#         if not user:
+#             return Response({"error": "Не авторизован"}, status=status.HTTP_401_UNAUTHORIZED)
         employee_ids = request.data.get('employees', [])
         start_str = request.data.get('start')
         end_str = request.data.get('end')
@@ -403,9 +403,9 @@ class ProductSalesView(APIView):
     """
 
     def get(self, request):
-        user = get_user_from_cookie(request)
-        if not user:
-            return Response({"error": "Не авторизован"}, status=status.HTTP_401_UNAUTHORIZED)
+#         user = get_user_from_cookie(request)
+#         if not user:
+#             return Response({"error": "Не авторизован"}, status=status.HTTP_401_UNAUTHORIZED)
         products = Service.objects.filter(role__is_tovar=True)
         data = [
             {
@@ -417,9 +417,9 @@ class ProductSalesView(APIView):
         return Response({'products': data})
 
     def post(self, request):
-        user = get_user_from_cookie(request)
-        if not user:
-            return Response({"error": "Не авторизован"}, status=status.HTTP_401_UNAUTHORIZED)
+#         user = get_user_from_cookie(request)
+#         if not user:
+#             return Response({"error": "Не авторизован"}, status=status.HTTP_401_UNAUTHORIZED)
         """
         Ожидается JSON:
         {
@@ -598,9 +598,9 @@ def get_deals_info(deals):
     return data
 class DealsInRangeView(APIView):
     def post(self, request):
-        user = get_user_from_cookie(request)
-        if not user:
-            return Response({"error": "Не авторизован"}, status=status.HTTP_401_UNAUTHORIZED)
+#         user = get_user_from_cookie(request)
+#         if not user:
+#             return Response({"error": "Не авторизован"}, status=status.HTTP_401_UNAUTHORIZED)
         start_str = request.data.get('start')
         end_str = request.data.get('end')
 
