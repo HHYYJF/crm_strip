@@ -183,7 +183,78 @@ class IndexAPIView(APIView):
 
         return Response({"shifts": shifts_data}, status=status.HTTP_200_OK)
 
+class IndexAPIViews(APIView):
 
+    def post(self, request):
+        # user = get_user_from_cookie(request)
+        # if not user:
+        #     return Response({"error": "Не авторизован"}, status=status.HTTP_401_UNAUTHORIZED)
+
+        serializer = ShiftCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        admin_id = serializer.validated_data['administrator_id']
+        barman_id = serializer.validated_data['bartender_id']
+
+        admin = Personal.objects.filter(id=admin_id).first()
+        barman = Personal.objects.filter(id=barman_id).first()
+
+        if not admin or not barman:
+            return Response({"error": "Админ или бармен не найдены"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Закрываем предыдущую активную смену, если есть
+        Shift.objects.filter(is_active=True).update(is_active=False)
+
+        # Создаём новую смену
+        shift = Shift.objects.create(admin=admin, barman=barman)
+
+        # Возвращаем ответ в формате GET
+        shift_data = {
+            "id": shift.id,
+            "started_at": shift.start_time.isoformat(),
+            "ended_at": shift.end_time.isoformat() if shift.end_time else None,
+            "staff": {
+                "administrator": {
+                    "id": admin.id,
+                    "username": admin.name
+                },
+                "bartender": {
+                    "id": barman.id,
+                    "username": barman.name
+                }
+            },
+            "status": "active" if shift.is_active else "closed"
+        }
+
+        return Response({"shifts": [shift_data]}, status=status.HTTP_201_CREATED)
+
+    def get(self, request):
+        # user = get_user_from_cookie(request)
+        # if not user:
+        #     return Response({"error": "Не авторизован"}, status=status.HTTP_401_UNAUTHORIZED)
+
+        shifts = Shift.objects.all().select_related('admin', 'barman')
+
+        shifts_data = []
+        for s in shifts:
+            shifts_data.append({
+                "id": s.id,
+                "started_at": s.start_time.isoformat(),
+                "ended_at": s.end_time.isoformat() if s.end_time else None,
+                "staff": {
+                    "administrator": {
+                        "id": s.admin.id if s.admin else None,
+                        "username": s.admin.name if s.admin else None
+                    },
+                    "bartender": {
+                        "id": s.barman.id if s.barman else None,
+                        "username": s.barman.name if s.barman else None
+                    }
+                },
+                "status": "active" if s.is_active else "closed"
+            })
+
+        return Response({"shifts": shifts_data}, status=status.HTTP_200_OK)
 
 class LogoutView(APIView):
     def get(self, request):
