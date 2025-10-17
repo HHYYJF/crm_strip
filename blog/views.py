@@ -314,6 +314,7 @@ class DealAPIView(APIView):
             "whoms": whoms,
             "services_tupe": services_tupe,
             "services": services,
+            "personals": personals,
 
         })
 
@@ -485,9 +486,9 @@ class ProductSalesView(APIView):
         return Response({'products': data})
 
     def post(self, request):
-#         user = get_user_from_cookie(request)
-#         if not user:
-#             return Response({"error": "Не авторизован"}, status=status.HTTP_401_UNAUTHORIZED)
+        # user = get_user_from_cookie(request)
+        # if not user:
+        #     return Response({"error": "Не авторизован"}, status=status.HTTP_401_UNAUTHORIZED)
         """
         Ожидается JSON:
         {
