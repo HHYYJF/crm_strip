@@ -185,46 +185,28 @@ class IndexAPIView(APIView):
 
 
 
-
-
-
-
 class LogoutView(APIView):
-    # authentication_classes = [TokenAuthentication]
-    # permission_classes = [IsAuthenticated]
-
     def get(self, request):
         user = get_user_from_cookie(request)
         if not user:
             return Response({"error": "Не авторизован"}, status=status.HTTP_401_UNAUTHORIZED)
-        user = request.user
 
         try:
-            personal = Personal.objects.all()
-            if not personal:
-                return Response({"error": "Сотрудник не найден"}, status=status.HTTP_404_NOT_FOUND)
-
+            # Все сделки делаем неактивными
             Deal.objects.all().update(ais=False)
 
-            # active_shift = Shift.objects.filter(
-            #     is_active=True
-            # ).filter(
-            #     models.Q(admin=personal) | models.Q(barman=personal)
-            # ).first()
-            active_shift = Shift.objects.filter(is_active=True)
+            # Закрываем все активные смены, где сотрудник участвует
+            active_shifts = Shift.objects.filter(is_active=True)
+            for shift in active_shifts:
+                shift.is_active = False
+                shift.end_time = timezone.now()
+                shift.save()
 
-            # 3️⃣ Закрываем смену, если есть
-            if active_shift:
-                active_shift.is_active = False
-                active_shift.end_time = timezone.now()
-                active_shift.save()
-
-            # 4️⃣ Удаляем токен, чтобы пользователь вышел полностью
-            user.auth_token.delete()
+            # Удаляем токен текущего пользователя
+            Token.objects.filter(user=user).delete()
 
             return Response({
-                "message": "Выход выполнен успешно. Все сделки закрыты, активная смена завершена.",
-                "shift_closed": bool(active_shift),
+                "message": "Выход выполнен успешно"
             }, status=status.HTTP_200_OK)
 
         except Exception as e:
@@ -246,30 +228,24 @@ class DealAPIView(APIView):
         user = get_user_from_cookie(request)
         if not user:
             return Response({"error": "Не авторизован"}, status=status.HTTP_401_UNAUTHORIZED)
-        active_deals = Deal.objects.filter(ais=True).select_related(
-            "personal", "services", "service", "payment", "whom"
-        )
 
-        service_types = Services.objects.all()
-
-        data = []
-        for s in service_types:
-            name = "Товар" if s.is_tovar else "Услуга"
-            data.append({
+        services_qs = Service.objects.select_related('role').all()
+        services = []
+        for s in services_qs:
+            services.append({
                 "id": s.id,
-                "name": name
+                "name": s.name,
+                "tovar": s.role.is_tovar if s.role else False
             })
+
         payments = list(Payment.objects.values("id", "name"))
         whoms = list(Whom.objects.values("id", "name"))
-        services = list(Service.objects.values("id", "name"))
-
         personals = list(Personal.objects.values("id", "name"))
 
         return Response({
             "payments": payments,
             "whoms": whoms,
             "services": services,
-            "service_types": data,
             "personals": personals
         })
 
