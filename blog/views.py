@@ -150,42 +150,51 @@ class IndexAPIView(APIView):
 
         return Response({"shifts": shifts_data}, status=status.HTTP_200_OK)
 
-class LogoutView(APIView):
-    authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
 
-    def post(self, request):
+
+
+
+
+
+class LogoutView(APIView):
+    # authentication_classes = [TokenAuthentication]
+    # permission_classes = [IsAuthenticated]
+
+    def get(self, request):
         user = request.user
 
         try:
-            # Находим сотрудника по username (если имена совпадают с пользователями Django)
-            personal = Personal.objects.filter(name=user.username).first()
-
+            personal = Personal.objects.all()
             if not personal:
                 return Response({"error": "Сотрудник не найден"}, status=status.HTTP_404_NOT_FOUND)
 
-            # Обновляем все сделки сотрудника
-            Deal.objects.filter(personal=personal).update(ais=False)
+            Deal.objects.all().update(ais=False)
 
-            # Находим активную смену, где он либо админ, либо бармен
-            active_shift = Shift.objects.filter(
-                is_active=True
-            ).filter(
-                models.Q(admin=personal) | models.Q(barman=personal)
-            ).first()
+            # active_shift = Shift.objects.filter(
+            #     is_active=True
+            # ).filter(
+            #     models.Q(admin=personal) | models.Q(barman=personal)
+            # ).first()
+            active_shift = Shift.objects.filter(is_active=True)
 
+            # 3️⃣ Закрываем смену, если есть
             if active_shift:
                 active_shift.is_active = False
                 active_shift.end_time = timezone.now()
                 active_shift.save()
 
+            # 4️⃣ Удаляем токен, чтобы пользователь вышел полностью
+            user.auth_token.delete()
+
             return Response({
-                "message": "Выход выполнен успешно. Сделки обновлены, активная смена закрыта.",
+                "message": "Выход выполнен успешно. Все сделки закрыты, активная смена завершена.",
                 "shift_closed": bool(active_shift),
             }, status=status.HTTP_200_OK)
 
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
