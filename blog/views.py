@@ -235,7 +235,7 @@ class DealAPIView(APIView):
                 service_id=data.get("service_id"),
                 payment_id=data.get("payment_id"),
                 whom_id=data.get("whom_id"),
-                maney=data.get("maney", 0),
+                maney= data.get("money", 0),
                 date_time=timezone.now(),
                 ais=True
             )
