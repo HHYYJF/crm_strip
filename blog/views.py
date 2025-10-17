@@ -289,17 +289,20 @@ class DealAPIView(APIView):
     """Создание и получение сделок"""
 
     def get(self, request):
-        # user = get_user_from_cookie(request)
-        # if not user:
-        #     return Response({"error": "Не авторизован"}, status=status.HTTP_401_UNAUTHORIZED)
+        services_tupe = [
+            {"id": 1, "name": "товар"},
+            {"id": 2, "name": "услуга"},
+        ]
 
+        # Сервисы с привязкой к типу
         services_qs = Service.objects.select_related('role').all()
         services = []
         for s in services_qs:
             services.append({
                 "id": s.id,
                 "name": s.name,
-                "tovar": s.role.is_tovar if s.role else False
+                "tovar": s.role.is_tovar if s.role else False,
+                "type_id": 1 if s.role and s.role.is_tovar else 2  # ссылается на services_tupe
             })
 
         payments = list(Payment.objects.values("id", "name"))
@@ -309,8 +312,9 @@ class DealAPIView(APIView):
         return Response({
             "payments": payments,
             "whoms": whoms,
+            "services_tupe": services_tupe,
             "services": services,
-            "personals": personals
+
         })
 
     def post(self, request):
@@ -352,9 +356,9 @@ class DealAPIView(APIView):
 
 @api_view(['GET'])
 def shift_staff(request):
-    user = get_user_from_cookie(request)
-    if not user:
-        return Response({"error": "Не авторизован"}, status=status.HTTP_401_UNAUTHORIZED)
+    # user = get_user_from_cookie(request)
+    # if not user:
+    #     return Response({"error": "Не авторизован"}, status=status.HTTP_401_UNAUTHORIZED)
     roles = Role.objects.filter(bool_name=True)  # фильтруем только нужные роли
     staff_data = {}
 
