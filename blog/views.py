@@ -16,30 +16,57 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.utils.dateparse import parse_datetime
-@api_view(['POST'])
-def login_view(request):
-    serializer = LoginSerializer(data=request.data)
-    if not serializer.is_valid():
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    username = serializer.validated_data['username']
-    password = serializer.validated_data['password']
-    user = authenticate(username=username, password=password)
 
+def get_user_from_cookie(request):
+    token_key = request.COOKIES.get('auth_token')
+    if not token_key:
+        return None
+
+    try:
+        token = Token.objects.get(key=token_key)
+        return token.user
+    except Token.DoesNotExist:
+        return None
+
+def tok(user):
+    """
+    Создание токена и возврат стандартного ответа с HttpOnly cookie
+    """
     if user is not None:
-        token, _ = Token.objects.get_or_create(user=user)
-        return Response({
-            "token": token.key,
+        Token.objects.filter(user=user).delete()
+        token = Token.objects.create(user=user)
+
+        # Создаем ответ
+        response = Response({
             "user": {
                 "id": user.id,
-                "username": user.username,
-            }
-        })
+                "username": user.username
+            },
+            "message": "Успешный вход"
+        }, status=status.HTTP_200_OK)
+        response.set_cookie(
+            key='auth_token',
+            value=token.key,
+            httponly=True,       # 🚫 JS не может прочитать
+            secure=False,        # True в проде (HTTPS)
+            samesite='Lax',      # 'None' если фронт и бэк на разных доменах
+            max_age=60 * 60 * 24 * 7  # неделя
+        )
+        return response
     else:
         return Response(
             {"error": "Неверное имя пользователя или пароль"},
             status=status.HTTP_401_UNAUTHORIZED
         )
+
+@api_view(['POST'])
+def login_view(request):
+    username = request.data.get('username')
+    password = request.data.get('password')
+    user = authenticate(username=username, password=password)
+    return tok(user)
+
 @api_view(['GET'])
 def HistoryAPIView(request):
     deals = Deal.objects.filter(ais=True).values(
@@ -84,10 +111,12 @@ def HistoryAPIView(request):
 
     return Response({"history": data})
 class IndexAPIView(APIView):
-    # authentication_classes = [TokenAuthentication]
-    # permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        user = get_user_from_cookie(request)
+        if not user:
+            return Response({"error": "Не авторизован"}, status=status.HTTP_401_UNAUTHORIZED)
+
         serializer = ShiftCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -127,6 +156,10 @@ class IndexAPIView(APIView):
         return Response({"shifts": [shift_data]}, status=status.HTTP_201_CREATED)
 
     def get(self, request):
+        user = get_user_from_cookie(request)
+        if not user:
+            return Response({"error": "Не авторизован"}, status=status.HTTP_401_UNAUTHORIZED)
+
         shifts = Shift.objects.all().select_related('admin', 'barman')
 
         shifts_data = []
@@ -161,6 +194,9 @@ class LogoutView(APIView):
     # permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        user = get_user_from_cookie(request)
+        if not user:
+            return Response({"error": "Не авторизован"}, status=status.HTTP_401_UNAUTHORIZED)
         user = request.user
 
         try:
@@ -207,6 +243,9 @@ class DealAPIView(APIView):
     """Создание и получение сделок"""
 
     def get(self, request):
+        user = get_user_from_cookie(request)
+        if not user:
+            return Response({"error": "Не авторизован"}, status=status.HTTP_401_UNAUTHORIZED)
         active_deals = Deal.objects.filter(ais=True).select_related(
             "personal", "services", "service", "payment", "whom"
         )
@@ -235,7 +274,9 @@ class DealAPIView(APIView):
         })
 
     def post(self, request):
-        """Создание новой сделки"""
+        user = get_user_from_cookie(request)
+        if not user:
+            return Response({"error": "Не авторизован"}, status=status.HTTP_401_UNAUTHORIZED)
         data = request.data
         try:
             deal = Deal.objects.create(
@@ -271,6 +312,9 @@ class DealAPIView(APIView):
 
 @api_view(['GET'])
 def shift_staff(request):
+    user = get_user_from_cookie(request)
+    if not user:
+        return Response({"error": "Не авторизован"}, status=status.HTTP_401_UNAUTHORIZED)
     roles = Role.objects.filter(bool_name=True)  # фильтруем только нужные роли
     staff_data = {}
 
@@ -297,6 +341,9 @@ class EmployeePerformanceView(APIView):
     """
 
     def get(self, request):
+        user = get_user_from_cookie(request)
+        if not user:
+            return Response({"error": "Не авторизован"}, status=status.HTTP_401_UNAUTHORIZED)
         employees = Personal.objects.all()
         data = [
             {
@@ -309,6 +356,9 @@ class EmployeePerformanceView(APIView):
         return Response({'employees': data})
 
     def post(self, request):
+        user = get_user_from_cookie(request)
+        if not user:
+            return Response({"error": "Не авторизован"}, status=status.HTTP_401_UNAUTHORIZED)
         employee_ids = request.data.get('employees', [])
         start_str = request.data.get('start')
         end_str = request.data.get('end')
@@ -377,7 +427,9 @@ class ProductSalesView(APIView):
     """
 
     def get(self, request):
-        # возвращаем все товары (Service с is_tovar=True)
+        user = get_user_from_cookie(request)
+        if not user:
+            return Response({"error": "Не авторизован"}, status=status.HTTP_401_UNAUTHORIZED)
         products = Service.objects.filter(role__is_tovar=True)
         data = [
             {
@@ -389,6 +441,9 @@ class ProductSalesView(APIView):
         return Response({'products': data})
 
     def post(self, request):
+        user = get_user_from_cookie(request)
+        if not user:
+            return Response({"error": "Не авторизован"}, status=status.HTTP_401_UNAUTHORIZED)
         """
         Ожидается JSON:
         {
@@ -448,6 +503,9 @@ from .models import Deal
 
 @api_view(['POST'])
 def historianalitic(request):
+    user = get_user_from_cookie(request)
+    if not user:
+        return Response({"error": "Не авторизован"}, status=status.HTTP_401_UNAUTHORIZED)
     start_str = request.data.get('start')
     end_str = request.data.get('end')
 
@@ -564,6 +622,9 @@ def get_deals_info(deals):
     return data
 class DealsInRangeView(APIView):
     def post(self, request):
+        user = get_user_from_cookie(request)
+        if not user:
+            return Response({"error": "Не авторизован"}, status=status.HTTP_401_UNAUTHORIZED)
         start_str = request.data.get('start')
         end_str = request.data.get('end')
 
