@@ -467,6 +467,7 @@ class ProductSalesView(APIView):
 
         return Response({'sales': output})
 
+
 """""""""""""""""""""""""""  история + расчет  """""""""""""""""""""""""""
 
 
