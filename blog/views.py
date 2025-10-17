@@ -186,10 +186,6 @@ class IndexAPIView(APIView):
 class IndexAPIViews(APIView):
 
     def post(self, request):
-        # user = get_user_from_cookie(request)
-        # if not user:
-        #     return Response({"error": "Не авторизован"}, status=status.HTTP_401_UNAUTHORIZED)
-
         serializer = ShiftCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -229,9 +225,6 @@ class IndexAPIViews(APIView):
         return Response({"shifts": [shift_data]}, status=status.HTTP_201_CREATED)
 
     def get(self, request):
-        # user = get_user_from_cookie(request)
-        # if not user:
-        #     return Response({"error": "Не авторизован"}, status=status.HTTP_401_UNAUTHORIZED)
 
         shifts = Shift.objects.all().select_related('admin', 'barman')
 
