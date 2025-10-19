@@ -89,6 +89,7 @@ class Deal(models.Model):
     whom = models.ForeignKey(Whom, on_delete=models.CASCADE, blank=True, null=True, verbose_name="Кому оказывалась услуга")
     maney = models.PositiveSmallIntegerField(default=0, verbose_name="Оплата")
     date_time = models.DateTimeField(auto_now_add=True, verbose_name="Дата и время")
+    quantity = models.PositiveSmallIntegerField(default=1,verbose_name="количество")
     ais = models.BooleanField(default=True,verbose_name="Закрыты/открыты записи") # понимание что сегодня отоброжать
 
     def __str__(self):

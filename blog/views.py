@@ -315,6 +315,7 @@ class DealAPIView(APIView):
             "services_tupe": services_tupe,
             "services": services,
             "personals": personals,
+            "quantity":0,
 
         })
 
@@ -330,6 +331,7 @@ class DealAPIView(APIView):
                 service_id=data.get("service_id"),
                 payment_id=data.get("payment_id"),
                 whom_id=data.get("whom_id"),
+                quantity=data.get("quantity"),
                 maney= data.get("money", 0),
                 date_time=timezone.now(),
                 ais=True
@@ -345,7 +347,9 @@ class DealAPIView(APIView):
                 "service": deal.service.name if deal.service else None,
                 "payment": deal.payment.name if deal.payment else None,
                 "whom": deal.whom.name if deal.whom else None,
+                "money_sum": deal.maney * deal.quantity,
                 "money": deal.maney,
+                "quantity": deal.quantity,
                 "created_at": deal.date_time.isoformat()
             }
 
